@@ -79,9 +79,10 @@ const CSV_URL = "https://docs.google.com/spreadsheets/d/14QjmJBnhg9wGDs7_-M2BkMa
 
 let plans = [];
 
-// 文字列から記号を除去して数値に変換する関数
+// 文字列からカンマや記号を消して数値にする関数
 function parseNum(val) {
   if (val === undefined || val === null || val === "") return 0;
+  // 数字、マイナス、ドット以外をすべて削除
   const num = Number(String(val).replace(/[^-0-9.]/g, ""));
   return isNaN(num) ? 0 : num;
 }
@@ -89,24 +90,16 @@ function parseNum(val) {
 fetch(CSV_URL)
   .then(res => res.text())
   .then(text => {
-    // CSVを正しく分割（引用符内のカンマを無視）
+    // CSVをパース（カンマ区切り、引用符考慮）
     const rows = text.trim().split(/\r?\n/).map(row => {
       const matches = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
       return matches ? matches.map(v => v.replace(/^"|"$/g, "").trim()) : [];
     });
     
-    // ヘッダーの空白などをクリーンアップ
-    const header = rows.shift().map(h => h.trim());
-    
-    plans = rows.map(r => {
-      const o = {};
-      header.forEach((h, i) => {
-        o[h] = r[i];
-      });
-      return o;
-    });
-    console.log("読み込み完了。ヘッダー一覧:", header); 
-    console.log("データ1件目:", plans[0]);
+    // 1行目（ヘッダー）を飛ばしてデータを入れる
+    rows.shift(); 
+    plans = rows; 
+    console.log("データの読み込みに成功しました。行数:", plans.length);
   });
 
 function calculate() {
@@ -120,48 +113,58 @@ function calculate() {
   const surCount = Number(document.getElementById("surgeryCount").value);
   const surCost = Number(document.getElementById("surgeryCost").value);
 
+  if (plans.length === 0) {
+    alert("データがまだ読み込まれていません。少し待ってから再度お試しください。");
+    return;
+  }
+
   const results = plans.map(p => {
-    // スプレッドシートの正確な列名に合わせる（トリミング済み）
-    const name = p["Insurance name&percentage"] || p["Insurance name"] || "不明";
+    // 列番号（0から数えて）で直接指定します
+    // C列(保険名) = index 2
+    // AY列(保険料合計) = index 50
+    // BN列(補償率) = index 65 (スプレッドシートの列位置に合わせて要確認)
+    // BO列(免責) = index 66
     
-    // 生涯保険料（AY列: Annual_premium_total）
+    const name = p[2] || "不明";
+    const annualPremium = parseNum(p[50]); // AY列付近
+    const rate = parseNum(p[65]) / 100;    // BN列付近
+    const deductible = parseNum(p[66]);    // BO列付近
+
+    // 生涯保険料計算（現在の設定：16歳まで一律）
     let premiumSum = 0;
-    const annualPremium = parseNum(p["Annual_premium_total"]);
     for (let age = startAge; age <= 16; age++) {
       premiumSum += annualPremium;
     }
 
-    // 自己負担額の計算（Compensation-rate, Disclaimer）
-    const rateVal = p["Compensation-rate"];
-    const rate = parseNum(rateVal) / 100;
-    const deductible = parseNum(p["Disclaimer"]);
+    // 自己負担計算
+    const calcSelf = (count, cost) => Math.max(0, (cost * count * (1 - rate)) + (count > 0 ? deductible : 0));
 
-    // 計算ロジック
-    const visitSelf = Math.max(0, vCost * vCount * (1 - rate) + (vCount > 0 ? deductible : 0));
-    const testSelf = Math.max(0, tCost * tCount * (1 - rate) + (tCount > 0 ? deductible : 0));
-    const staySelf = Math.max(0, sCost * sCount * (1 - rate) + (sCount > 0 ? deductible : 0));
-    const surgerySelf = Math.max(0, surCost * surCount * (1 - rate) + (surCount > 0 ? deductible : 0));
-
-    const selfTotal = visitSelf + testSelf + staySelf + surgerySelf;
+    const selfTotal = calcSelf(vCount, vCost) + 
+                      calcSelf(tCount, tCost) + 
+                      calcSelf(sCount, sCost) + 
+                      calcSelf(surCount, surCost);
+                      
     const grandTotal = premiumSum + selfTotal;
 
-    return {
-      name: name,
-      premiumSum,
-      selfTotal,
-      grandTotal
-    };
+    return { name, premiumSum, selfTotal, grandTotal };
   });
 
-  // 計算不能なものを除外して安い順にソート
-  const filteredResults = results.filter(r => r.name !== "不明");
-  filteredResults.sort((a, b) => a.grandTotal - b.grandTotal);
-  render(filteredResults);
+  // 合計金額が有効なものだけを表示し、安い順に並び替え
+  const filtered = results.filter(r => r.name !== "不明" && !isNaN(r.grandTotal));
+  filtered.sort((a, b) => a.grandTotal - b.grandTotal);
+  
+  render(filtered);
 }
 
 function render(list) {
   const tbody = document.querySelector("#resultTable tbody");
   tbody.innerHTML = "";
+  
+  if (list.length === 0) {
+    tbody.innerHTML = "<tr><td colspan='4'>該当するデータがありません</td></tr>";
+    return;
+  }
+
   list.forEach(r => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
@@ -174,10 +177,10 @@ function render(list) {
   });
 }
 </script>
-
 </body>
 
 </html>
+
 
 
 
