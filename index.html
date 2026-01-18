@@ -79,55 +79,64 @@ const CSV_URL = "https://docs.google.com/spreadsheets/d/14QjmJBnhg9wGDs7_-M2BkMa
 
 let plans = [];
 
-// 文字列からカンマ等を除去して数値に変換する関数
+// 文字列から記号を除去して数値に変換する関数
 function parseNum(val) {
-  if (!val) return 0;
-  // カンマ、％、円などの記号を削除して数値化
-  const num = Number(val.replace(/[^-0-9.]/g, ""));
+  if (val === undefined || val === null || val === "") return 0;
+  const num = Number(String(val).replace(/[^-0-9.]/g, ""));
   return isNaN(num) ? 0 : num;
 }
 
 fetch(CSV_URL)
   .then(res => res.text())
   .then(text => {
-    // CSVを正しく分割する正規表現（カンマ区切りだが引用符内は無視）
+    // CSVを正しく分割（引用符内のカンマを無視）
     const rows = text.trim().split(/\r?\n/).map(row => {
-      return row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g)?.map(v => v.replace(/"/g, "")) || [];
+      const matches = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+      return matches ? matches.map(v => v.replace(/^"|"$/g, "").trim()) : [];
     });
     
-    const header = rows.shift();
+    // ヘッダーの空白などをクリーンアップ
+    const header = rows.shift().map(h => h.trim());
+    
     plans = rows.map(r => {
       const o = {};
-      header.forEach((h, i) => o[h] = r[i]);
+      header.forEach((h, i) => {
+        o[h] = r[i];
+      });
       return o;
     });
-    console.log("Loaded plans:", plans); // デバッグ用
+    console.log("読み込み完了。ヘッダー一覧:", header); 
+    console.log("データ1件目:", plans[0]);
   });
 
 function calculate() {
-  const startAge = Number(startAgeInput.value);
-  const vCount = Number(visitCountInput.value);
-  const vCost = Number(visitCostInput.value);
-  const tCount = Number(testCountInput.value);
-  const tCost = Number(testCostInput.value);
-  const sCount = Number(stayCountInput.value);
-  const sCost = Number(stayCostInput.value);
-  const surCount = Number(surgeryCountInput.value);
-  const surCost = Number(surgeryCostInput.value);
+  const startAge = Number(document.getElementById("startAge").value);
+  const vCount = Number(document.getElementById("visitCount").value);
+  const vCost = Number(document.getElementById("visitCost").value);
+  const tCount = Number(document.getElementById("testCount").value);
+  const tCost = Number(document.getElementById("testCost").value);
+  const sCount = Number(document.getElementById("stayCount").value);
+  const sCost = Number(document.getElementById("stayCost").value);
+  const surCount = Number(document.getElementById("surgeryCount").value);
+  const surCost = Number(document.getElementById("surgeryCost").value);
 
   const results = plans.map(p => {
-    // 1. 生涯保険料の計算（AY列: Annual_premium_total を参照していると想定）
-    // 注意: スプレッドシートの列名が "Total_self-payment" で合っているか確認してください
+    // スプレッドシートの正確な列名に合わせる（トリミング済み）
+    const name = p["Insurance name&percentage"] || p["Insurance name"] || "不明";
+    
+    // 生涯保険料（AY列: Annual_premium_total）
     let premiumSum = 0;
-    const annualPremium = parseNum(p["Annual_premium_total"] || p["Total_self-payment"] || "0");
+    const annualPremium = parseNum(p["Annual_premium_total"]);
     for (let age = startAge; age <= 16; age++) {
       premiumSum += annualPremium;
     }
 
-    // 2. 自己負担額の計算
-    const rate = parseNum(p["Compensation-rate"]) / 100;
+    // 自己負担額の計算（Compensation-rate, Disclaimer）
+    const rateVal = p["Compensation-rate"];
+    const rate = parseNum(rateVal) / 100;
     const deductible = parseNum(p["Disclaimer"]);
 
+    // 計算ロジック
     const visitSelf = Math.max(0, vCost * vCount * (1 - rate) + (vCount > 0 ? deductible : 0));
     const testSelf = Math.max(0, tCost * tCount * (1 - rate) + (tCount > 0 ? deductible : 0));
     const staySelf = Math.max(0, sCost * sCount * (1 - rate) + (sCount > 0 ? deductible : 0));
@@ -137,15 +146,15 @@ function calculate() {
     const grandTotal = premiumSum + selfTotal;
 
     return {
-      name: p["Insurance name&percentage"],
+      name: name,
       premiumSum,
       selfTotal,
       grandTotal
     };
   });
 
-  // NaNを除外してソート
-  const filteredResults = results.filter(r => !isNaN(r.grandTotal));
+  // 計算不能なものを除外して安い順にソート
+  const filteredResults = results.filter(r => r.name !== "不明");
   filteredResults.sort((a, b) => a.grandTotal - b.grandTotal);
   render(filteredResults);
 }
@@ -156,20 +165,19 @@ function render(list) {
   list.forEach(r => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td class="big">${r.name || '不明'}</td>
-      <td class="big">${Math.floor(r.selfTotal).toLocaleString()}円</td>
-      <td>${Math.floor(r.premiumSum).toLocaleString()}円</td>
-      <td style="font-weight:bold; color:red;">${Math.floor(r.grandTotal).toLocaleString()}円</td>
+      <td class="big" style="text-align:left;">${r.name}</td>
+      <td class="big">${Math.floor(r.selfTotal).toLocaleString()}</td>
+      <td>${Math.floor(r.premiumSum).toLocaleString()}</td>
+      <td style="font-weight:bold; color:red;">${Math.floor(r.grandTotal).toLocaleString()}</td>
     `;
     tbody.appendChild(tr);
   });
 }
-
-// input shortcut（以下省略、既存のままでOK）
 </script>
 
 </body>
 
 </html>
+
 
 
