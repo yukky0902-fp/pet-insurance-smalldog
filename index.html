@@ -106,14 +106,14 @@ function calculate() {
   const surgeryCost = Number(surgeryCostInput.value);
 
   const results = plans.map(p => {
-    // AY列：保険料合計（P〜16歳）
+    // AY列：Total self-payment
     let premiumSum = 0;
     for (let age = startAge; age <= 16; age++) {
-      premiumSum += Number(p[age] || 0);
+      premiumSum += Number(p["Total self-payment"] || 0);
     }
 
-    const rate = Number(p["B"]) / 100;
-    const deductible = Number(p["D"]);
+    const rate = Number(p["Compensation rate"]) / 100;
+    const deductible = Number(p["Disclaimer"]);
 
     const visitSelf =
       Math.max(0, visitCost * visitCount * (1 - rate) + deductible);
@@ -128,7 +128,7 @@ function calculate() {
     const grandTotal = premiumSum + selfTotal;
 
     return {
-      name: p["C"],
+      name: p["Insurance name & percentage"],
       premiumSum,
       selfTotal,
       grandTotal
@@ -167,4 +167,5 @@ const surgeryCostInput = document.getElementById("surgeryCost");
 </script>
 
 </body>
+
 </html>
