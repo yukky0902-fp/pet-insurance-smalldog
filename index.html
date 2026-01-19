@@ -10,10 +10,25 @@
         h1 { font-size: 18px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
         
         .input-section { display: grid; grid-template-columns: 150px 100px 150px 100px; gap: 10px; margin-bottom: 20px; align-items: center; }
-        .input-group { display: contents; }
         label { font-size: 14px; }
         input { padding: 4px; border: 2px solid #000; text-align: right; width: 80px; font-size: 16px; }
         
+        /* Startボタンのスタイル */
+        .button-container { grid-column: 1 / 5; text-align: center; margin-top: 10px; }
+        .start-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .start-btn:hover { background-color: #0056b3; }
+        .start-btn:active { transform: translateY(2px); }
+
         .ranking-title { font-size: 16px; margin-top: 30px; border-bottom: 1px solid #000; }
         
         .results-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
@@ -22,7 +37,6 @@
 
         .plan-name { font-size: 20px; font-weight: bold; }
         .total-amount { font-size: 22px; font-weight: bold; color: #000; }
-        .sub-info { font-size: 14px; color: #333; }
         .badge-info { font-size: 12px; color: #555; background: #f0f0f0; padding: 2px 5px; border-radius: 3px; }
     </style>
 </head>
@@ -37,24 +51,28 @@
         <div></div><div></div>
 
         <label>通院回数</label>
-        <input type="number" id="numVisits" value="10" step="1">
+        <input type="number" id="numVisits" value="10">
         <label>通院費用</label>
-        <input type="number" id="costVisit" value="6000" step="1000">
+        <input type="number" id="costVisit" value="6000">
 
         <label>検査回数</label>
-        <input type="number" id="numTests" value="1" step="1">
+        <input type="number" id="numTests" value="1">
         <label>検査費用</label>
-        <input type="number" id="costTest" value="150000" step="10000">
+        <input type="number" id="costTest" value="150000">
 
         <label>入院回数</label>
-        <input type="number" id="numHosp" value="10" step="1">
+        <input type="number" id="numHosp" value="10">
         <label>入院費用</label>
-        <input type="number" id="costHosp" value="10000" step="1000">
+        <input type="number" id="costHosp" value="10000">
 
         <label>手術回数</label>
-        <input type="number" id="numSurg" value="1" step="1">
+        <input type="number" id="numSurg" value="1">
         <label>手術費用</label>
-        <input type="number" id="costSurg" value="200000" step="10000">
+        <input type="number" id="costSurg" value="200000">
+
+        <div class="button-container">
+            <button class="start-btn" id="startBtn">Start</button>
+        </div>
     </div>
 
     <div class="ranking-title">ランキング</div>
@@ -74,27 +92,38 @@
 </div>
 
 <script>
-    // スプレッドシートのID
     const SPREADSHEET_ID = '14QjmJBnhg9wGDs7_-M2BkMacN-tLvYaLVx7QJtixq-M';
-    // シートからデータを取得するためのURL (CSV形式で取得するのが最も簡単です)
     const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=0`;
 
     let insuranceData = [];
 
-    // データ読み込み
+    // ボタンクリックイベントの設定
+    document.getElementById('startBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('startBtn');
+        btn.innerText = "計算中...";
+        btn.disabled = true;
+
+        try {
+            await fetchData();
+        } catch (error) {
+            alert("データの取得に失敗しました。");
+            console.error(error);
+        } finally {
+            btn.innerText = "Start";
+            btn.disabled = false;
+        }
+    });
+
     async function fetchData() {
         const response = await fetch(CSV_URL);
         const text = await response.text();
         const rows = text.split('\n').map(row => row.split(','));
         
-        // ヘッダーを除いたデータ行をオブジェクト化 (列のインデックスはA=0, B=1...)
-        // 列指定: C=2(名), B=1(割合), D=3(免責), E~T(1~16歳保険料) ※シート構造に合わせて調整
         insuranceData = rows.slice(1).map(r => ({
-            name: r[2],       // C列
-            ratio: parseFloat(r[1]) / 100 || 0, // B列 (補償割合 70% -> 0.7)
-            deductible: parseFloat(r[3]) || 0,  // D列 (免責金額)
-            premiums: r.slice(4, 20).map(v => parseFloat(v) || 0), // E列〜T列 (1歳〜16歳)
-            note: r[38] || "" // AM列付近の備考など (適宜調整)
+            name: r[2],
+            ratio: parseFloat(r[1]) / 100 || 0,
+            deductible: parseFloat(r[3]) || 0,
+            premiums: r.slice(4, 20).map(v => parseFloat(v) || 0),
         })).filter(d => d.name);
         
         calculate();
@@ -112,28 +141,19 @@
         const cs = parseInt(document.getElementById('costSurg').value);
 
         const results = insuranceData.map(plan => {
-            // 1. 生涯保険料合計 (開始年齢〜16歳)
-            // インデックスは 年齢-1
             let totalPremium = 0;
             for (let i = startAge - 1; i < 16; i++) {
                 totalPremium += plan.premiums[i] || 0;
             }
 
-            // 2. 各自己負担額の計算 (費用 - 免責) * (1 - 補償割合)
             const calcSelfPay = (cost, count) => {
                 if (count <= 0) return 0;
                 let singlePay = (cost - plan.deductible) * (1 - plan.ratio);
                 if (singlePay < 0) singlePay = 0;
-                // 実際は「(費用 * (1-割合)) + 免責」などの計算式の場合もありますが、
-                // 指示に従い「免責と補償割合を考慮」して算出します
                 return Math.round(singlePay * count);
             };
 
-            const at = calcSelfPay(cv, nv); // 通院
-            const au = calcSelfPay(ct, nt); // 検査
-            const av = calcSelfPay(ch, nh); // 入院
-            const aw = calcSelfPay(cs, ns); // 手術
-            const totalSelfPay = at + au + av + aw;
+            const totalSelfPay = calcSelfPay(cv, nv) + calcSelfPay(ct, nt) + calcSelfPay(ch, nh) + calcSelfPay(cs, ns);
 
             return {
                 ...plan,
@@ -143,9 +163,7 @@
             };
         });
 
-        // 総支払額(totalPayment)の昇順に並べ替え
         results.sort((a, b) => a.totalPayment - b.totalPayment);
-
         render(results);
     }
 
@@ -165,14 +183,6 @@
             tbody.appendChild(row);
         });
     }
-
-    // 入力イベント設定
-    document.querySelectorAll('input').forEach(input => {
-        input.addEventListener('input', calculate);
-    });
-
-    // 初期読み込み
-    fetchData();
 </script>
 
 </body>
