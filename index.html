@@ -12,15 +12,14 @@
         label { font-size: 0.9rem; font-weight: bold; }
         input { padding: 6px; border: 1px solid #ccc; border-radius: 4px; text-align: right; width: 90px; font-size: 1rem; }
         .button-area { grid-column: 1 / 5; text-align: center; margin-top: 15px; }
-        .start-btn { background: #007bff; color: white; border: none; padding: 12px 60px; font-size: 1.1rem; font-weight: bold; border-radius: 5px; cursor: pointer; transition: 0.2s; }
-        .start-btn:hover { background: #0056b3; }
-        .start-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .start-btn { background: #007bff; color: white; border: none; padding: 12px 60px; font-size: 1.1rem; font-weight: bold; border-radius: 5px; cursor: pointer; }
+        .start-btn:disabled { background: #ccc; }
         .results-table { width: 100%; border-collapse: collapse; margin-top: 25px; }
         .results-table th { background: #f2f2f2; padding: 12px; border-bottom: 2px solid #333; text-align: left; font-size: 0.9rem; }
         .results-table td { padding: 15px 12px; border-bottom: 1px solid #eee; }
-        .plan-name { font-weight: bold; color: #0056b3; font-size: 1.1rem; line-height: 1.2; }
+        .plan-name { font-weight: bold; color: #0056b3; font-size: 1.1rem; }
         .total-pay { font-weight: bold; color: #d9534f; font-size: 1.3rem; }
-        .error-msg { color: #d9534f; margin-top: 10px; font-weight: bold; display: none; }
+        .error-msg { color: #d9534f; background: #fff5f5; border: 1px solid #d9534f; padding: 10px; margin-top: 10px; display: none; border-radius: 5px; font-size: 0.9rem; }
     </style>
 </head>
 <body>
@@ -50,42 +49,40 @@
 </div>
 
 <script>
-    // image_05826b.png で確認できた最新の公開URL
+    // image_05826b.pngに表示されていた公開用CSVの直リンク
     const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSwgCvHIDI6YtpEX9b1n_nNYQU-iOFVhoE7U9OdHXe_q9cbJjumZSMpxTZtDTwqRO7UBRElKMZCSP2a/pub?gid=1826550484&single=true&output=csv';
 
     document.getElementById('startBtn').addEventListener('click', async () => {
         const btn = document.getElementById('startBtn');
         const err = document.getElementById('errorMsg');
         btn.disabled = true;
-        btn.innerText = "読込中...";
+        btn.innerText = "データ読込中...";
         err.style.display = "none";
 
         try {
+            // fetchの第2引数に mode: 'cors' を指定せず、ブラウザのキャッシュを回避
             const response = await fetch(`${CSV_URL}&t=${Date.now()}`);
             if (!response.ok) throw new Error("データの取得に失敗しました。");
             
             const text = await response.text();
+            // CSV解析
             const rows = text.split(/\r?\n/).map(row => row.split(',').map(c => c.replace(/^"|"$/g, '').trim()));
             
-            // image_05826b.png のシート構造に基づくマッピング
-            // A列(0)=Company, B列(1)=Compensation%, C列(2)=InsuranceName, D列(3)=Deductible
-            // J列以降が保険料（シートにより多少ズレる可能性があるため調整）
-            const insuranceData = rows.slice(1).filter(r => r[2] && r[2] !== "").map(r => ({
+            // B列=割合, C列=名前, D列=免責, T列(index19)以降=保険料
+            const insuranceData = rows.slice(1).filter(r => r[2]).map(r => ({
                 name: r[2], 
                 ratio: parseFloat(r[1]) / 100 || 0,
-                deductible: parseFloat(r[3]) || 0,
-                // 保険料が「6歳11か月」などの列(T列付近)から始まっている場合を想定
-                // ここでは列J(9)から16個分を取得
+                deductible: parseFloat(r[3].replace(/[^0-9]/g, '')) || 0,
+                // 保険料列(T列〜AI列想定)から数値のみ抽出
                 premiums: r.slice(19, 35).map(v => parseFloat(v.replace(/[^0-9]/g, '')) || 0)
             }));
 
-            if (insuranceData.length === 0) throw new Error("有効なデータが見つかりませんでした。");
-            
+            if (insuranceData.length === 0) throw new Error("表示できるデータがありません。");
             calculate(insuranceData);
+            
         } catch (e) {
-            err.innerText = e.message;
+            err.innerText = "エラー: " + e.message + "。スプレッドシートがCSV形式で公開されているか再確認してください。";
             err.style.display = "block";
-            console.error(e);
         } finally {
             btn.disabled = false;
             btn.innerText = "Start";
@@ -106,8 +103,8 @@
         };
 
         const results = data.map(plan => {
-            // 保険料合計（月額想定なら12倍、年額ならそのまま）
             let totalPrem = 0;
+            // 開始年齢から16歳までの保険料を合算
             for (let i = startAge - 1; i < plan.premiums.length; i++) {
                 totalPrem += plan.premiums[i]; 
             }
@@ -136,11 +133,11 @@
         const tbody = document.getElementById('rankingBody');
         tbody.innerHTML = data.map(p => `
             <tr>
-                <td><div class="plan-name">${p.name}</div><div style="font-size:12px;color:#666;">補償割合:${p.ratio*100}%</div></td>
+                <td><div class="plan-name">${p.name}</div><div style="font-size:12px;color:#666;">補償:${p.ratio*100}%</div></td>
                 <td><div class="total-pay">${p.totalPayment.toLocaleString()}円</div></td>
                 <td>${p.totalPremium.toLocaleString()}円</td>
                 <td>${p.totalSelfPay.toLocaleString()}円</td>
-                <td><span style="font-size:12px; background:#eee; padding:2px 5px; border-radius:3px;">免責:${p.deductible}円</span></td>
+                <td><span style="font-size:12px; background:#eee; padding:2px 5px;">免責:${p.deductible}円</span></td>
             </tr>
         `).join('');
     }
