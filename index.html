@@ -44,11 +44,11 @@
         <thead>
             <tr>
                 <th style="width: 5%;">順位</th>
-                <th style="width: 25%;">保険名(C列)</th>
-                <th style="width: 18%;">総支払合計(D列)</th>
-                <th style="width: 18%;">生涯保険料(E列)</th>
-                <th style="width: 15%;">自己負担(F列)</th>
-                <th style="width: 19%;">詳細(G列)</th>
+                <th style="width: 25%;">保険名</th>
+                <th style="width: 18%;">総支払合計</th>
+                <th style="width: 18%;">生涯保険料</th>
+                <th style="width: 15%;">自己負担</th>
+                <th style="width: 19%;">詳細</th>
             </tr>
         </thead>
         <tbody id="rankingBody">
@@ -67,28 +67,25 @@
         try {
             const response = await fetch(`${CSV_URL}&t=${Date.now()}`);
             const text = await response.text();
-            // CSVを解析
             const rows = text.split(/\r?\n/).map(row => row.split(',').map(c => c.replace(/^"|"$/g, '').trim()));
             
-            // 最新のスプレッドシート構造 に基づくインデックス
+            // D(3), E(4), F(5)列を参照
             const data = rows.slice(1).filter(r => r[2]).map(r => {
                 const parseNum = (val) => parseInt(val?.replace(/[^0-9]/g, '')) || 0;
                 return {
-                    name: r[2],           // C列: Insurance name
-                    ratio: r[1],          // B列: Com
-                    totalPay: parseNum(r[3]), // D列: Total payout (旧BA列)
-                    premium: parseNum(r[4]),  // E列: Total life insurance (旧AJ列)
-                    selfPay: parseNum(r[5]),  // F列: Total self-pay (旧AX列)
-                    detail: r[6] || ""     // G列: Item name (旧J列)
+                    name: r[2],
+                    ratio: r[1],
+                    totalPay: parseNum(r[3]),
+                    premium: parseNum(r[4]),
+                    selfPay: parseNum(r[5]),
+                    detail: r[6] || ""
                 };
             }).filter(p => p.totalPay > 0);
 
-            // 総支払合計(D列)の少ない順に並び替え
             data.sort((a, b) => a.totalPay - b.totalPay);
-
             render(data);
         } catch (e) {
-            alert("エラー: データの読み込みに失敗しました。公開設定を確認してください。");
+            alert("データの取得に失敗しました。");
         } finally {
             btn.innerText = "Start";
         }
