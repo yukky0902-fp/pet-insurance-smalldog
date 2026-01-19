@@ -90,14 +90,12 @@
             </tbody>
     </table>
 </div>
-
 <script>
-    const SPREADSHEET_ID = '14QjmJBnhg9wGDs7_-M2BkMacN-tLvYaLVx7QJtixq-M';
-    const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=0`;
+    // 公開したCSVのURL（ここを直接書き換えるのが一番確実です）
+    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS-qU2nE4H2n2T_DExX4_R67I9qK9x-n2z-VpL0Xh6_mE-p8v_Y-L-t-N-B-y-P_0Q-X-P-L/pub?gid=0&output=csv';
 
     let insuranceData = [];
 
-    // ボタンクリックイベントの設定
     document.getElementById('startBtn').addEventListener('click', async () => {
         const btn = document.getElementById('startBtn');
         btn.innerText = "計算中...";
@@ -106,7 +104,7 @@
         try {
             await fetchData();
         } catch (error) {
-            alert("データの取得に失敗しました。");
+            alert("データの取得に失敗しました。スプレッドシートが『ウェブに公開』されているか確認してください。");
             console.error(error);
         } finally {
             btn.innerText = "Start";
@@ -117,37 +115,44 @@
     async function fetchData() {
         const response = await fetch(CSV_URL);
         const text = await response.text();
-        const rows = text.split('\n').map(row => row.split(','));
         
-        insuranceData = rows.slice(1).map(r => ({
-            name: r[2],
-            ratio: parseFloat(r[1]) / 100 || 0,
-            deductible: parseFloat(r[3]) || 0,
-            premiums: r.slice(4, 20).map(v => parseFloat(v) || 0),
-        })).filter(d => d.name);
+        // CSV解析（カンマ区切り、改行コード対応）
+        const rows = text.split(/\r?\n/).map(row => row.split(','));
+        
+        insuranceData = rows.slice(1).map(r => {
+            // 列のインデックスがズレていないか注意
+            return {
+                name: r[2],       // C列: 保険名
+                ratio: parseFloat(r[1]) / 100 || 0, // B列: 補償割合
+                deductible: parseFloat(r[3]) || 0,  // D列: 免責
+                premiums: r.slice(4, 20).map(v => parseFloat(v) || 0), // E-T列: 保険料
+            };
+        }).filter(d => d.name); // 名前が空の行を除外
         
         calculate();
     }
 
     function calculate() {
         const startAge = parseInt(document.getElementById('startAge').value);
-        const nv = parseInt(document.getElementById('numVisits').value);
-        const cv = parseInt(document.getElementById('costVisit').value);
-        const nt = parseInt(document.getElementById('numTests').value);
-        const ct = parseInt(document.getElementById('costTest').value);
-        const nh = parseInt(document.getElementById('numHosp').value);
-        const ch = parseInt(document.getElementById('costHosp').value);
-        const ns = parseInt(document.getElementById('numSurg').value);
-        const cs = parseInt(document.getElementById('costSurg').value);
+        const nv = parseInt(document.getElementById('numVisits').value) || 0;
+        const cv = parseInt(document.getElementById('costVisit').value) || 0;
+        const nt = parseInt(document.getElementById('numTests').value) || 0;
+        const ct = parseInt(document.getElementById('costTest').value) || 0;
+        const nh = parseInt(document.getElementById('numHosp').value) || 0;
+        const ch = parseInt(document.getElementById('costHosp').value) || 0;
+        const ns = parseInt(document.getElementById('numSurg').value) || 0;
+        const cs = parseInt(document.getElementById('costSurg').value) || 0;
 
         const results = insuranceData.map(plan => {
             let totalPremium = 0;
+            // 5歳開始なら、配列の4番目(index 4)から15番目までを合計
             for (let i = startAge - 1; i < 16; i++) {
                 totalPremium += plan.premiums[i] || 0;
             }
 
             const calcSelfPay = (cost, count) => {
-                if (count <= 0) return 0;
+                if (count <= 0 || cost <= 0) return 0;
+                // (費用 - 免責) * (1 - 補償割合)
                 let singlePay = (cost - plan.deductible) * (1 - plan.ratio);
                 if (singlePay < 0) singlePay = 0;
                 return Math.round(singlePay * count);
@@ -163,6 +168,7 @@
             };
         });
 
+        // 安い順にソート
         results.sort((a, b) => a.totalPayment - b.totalPayment);
         render(results);
     }
@@ -171,13 +177,18 @@
         const tbody = document.getElementById('rankingBody');
         tbody.innerHTML = '';
 
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5">データが見つかりませんでした。</td></tr>';
+            return;
+        }
+
         data.forEach(plan => {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td><div class="plan-name">${plan.name}</div></td>
-                <td><div class="total-amount">${plan.totalPayment.toLocaleString()}円</div></td>
-                <td>${plan.totalPremium.toLocaleString()}円</td>
-                <td>${plan.totalSelfPay.toLocaleString()}円</td>
+                <td><div class="total-amount">${Math.floor(plan.totalPayment).toLocaleString()}円</div></td>
+                <td>${Math.floor(plan.totalPremium).toLocaleString()}円</td>
+                <td>${Math.floor(plan.totalSelfPay).toLocaleString()}円</td>
                 <td><span class="badge-info">免:${plan.deductible}</span></td>
             `;
             tbody.appendChild(row);
@@ -187,3 +198,4 @@
 
 </body>
 </html>
+
