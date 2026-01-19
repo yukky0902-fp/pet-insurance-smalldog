@@ -2,10 +2,9 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ペット保険 総支払シミュレーション</title>
     <style>
-        body { font-family: "Helvetica Neue", Arial, sans-serif; margin: 20px; background-color: #f5f7fa; color: #333; }
+        body { font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif; margin: 20px; background-color: #f5f7fa; color: #333; }
         .container { max-width: 1000px; margin: auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { font-size: 20px; border-left: 5px solid #007bff; padding-left: 15px; margin-bottom: 25px; }
         .input-section { display: grid; grid-template-columns: 150px 120px 150px 120px; gap: 15px; margin-bottom: 30px; align-items: center; background: #f8f9fa; padding: 20px; border-radius: 8px; }
@@ -13,22 +12,19 @@
         input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; text-align: right; width: 100px; font-size: 16px; }
         .button-container { grid-column: 1 / 5; text-align: center; margin-top: 10px; }
         .start-btn { background-color: #007bff; color: white; border: none; padding: 12px 60px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; }
-        
-        /* ランキング見出し */
         .ranking-title { font-size: 20px; font-weight: bold; margin: 30px 0 15px 0; color: #333; }
-        
         .results-table { width: 100%; border-collapse: collapse; }
         .results-table th { text-align: left; border-bottom: 2px solid #333; padding: 12px 8px; font-size: 14px; background: #eee; }
         .results-table td { border-bottom: 1px solid #ddd; padding: 15px 8px; }
         .total-amount { font-size: 18px; font-weight: bold; color: #d9534f; }
-        .detail-text { font-size: 12px; color: #666; white-space: pre-wrap; }
+        .detail-text { font-size: 12px; color: #666; }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>保険 総支払シミュレーション</h1>
     <div class="input-section">
-        <label>保険開始年齢</label><input type="number" id="startAge" value="5" min="1" max="16">
+        <label>保険開始年齢</label><input type="number" id="startAge" value="1" min="1" max="16">
         <div></div><div></div>
         <label>通院回数</label><input type="number" id="numVisits" value="10">
         <label>通院費用</label><input type="number" id="costVisit" value="6000">
@@ -68,7 +64,7 @@
     document.getElementById('startBtn').addEventListener('click', async () => {
         const startAge = parseInt(document.getElementById('startAge').value) || 1;
         const btn = document.getElementById('startBtn');
-        btn.innerText = "計算中...";
+        btn.innerText = "データ取得中...";
         
         try {
             const response = await fetch(`${CSV_URL}&t=${Date.now()}`);
@@ -78,38 +74,35 @@
             const data = rows.slice(1).filter(r => r[2]).map(r => {
                 const parseNum = (val) => parseInt(val?.replace(/[^0-9]/g, '')) || 0;
                 
-                // --- 生涯保険料の参照列選択 ---
-                // 開始年齢 1 = G列(インデックス 6)
-                // 開始年齢 2 = H列(インデックス 7)
-                // ...
-                // 開始年齢 16 = V列(インデックス 21)
-                // 計算式: 5 + startAge
-                const premiumColIndex = 5 + startAge;
+                // --- 生涯保険料の取得 ---
+                // 開始年齢 1 = G列(Index 6)
+                // 開始年齢 16 = V列(Index 21)
+                const premiumColIndex = 5 + startAge; 
                 const premium = parseNum(r[premiumColIndex]);
                 
-                // 自己負担: F列(インデックス 5)
+                // --- 自己負担の取得 ---
+                // F列(Index 5)
                 const selfPay = parseNum(r[5]); 
                 
-                // 総支払合計 = 選択した列の生涯保険料 + F列の自己負担
+                // 総支払合計 = 生涯保険料 + 自己負担
                 const totalPay = premium + selfPay;
 
                 return {
-                    name: r[2],       // C列
-                    ratio: r[1],      // B列
+                    name: r[2],       // C列: 保険名
+                    ratio: r[1],      // B列: 補償割合
                     totalPay: totalPay,
                     premium: premium,
                     selfPay: selfPay,
-                    detail: r[22] || "" // W列以降に詳細がある場合は適宜変更してください。画像ではV列の次はW列(22)です。
+                    detail: r[22] || "" // W列: 詳細テキスト
                 };
             }).filter(p => p.name);
 
-            // 総支払合計の昇順でソート
+            // 総支払合計の少ない順にソート
             data.sort((a, b) => a.totalPay - b.totalPay);
 
             render(data);
         } catch (e) {
-            console.error(e);
-            alert("データの取得に失敗しました。");
+            alert("エラーが発生しました。");
         } finally {
             btn.innerText = "Start";
         }
