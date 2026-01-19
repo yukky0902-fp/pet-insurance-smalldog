@@ -13,17 +13,22 @@
         input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; text-align: right; width: 100px; font-size: 16px; }
         .button-container { grid-column: 1 / 5; text-align: center; margin-top: 10px; }
         .start-btn { background-color: #007bff; color: white; border: none; padding: 12px 60px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; }
-        .results-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        
+        /* ランキング見出し */
+        .ranking-title { font-size: 20px; font-weight: bold; margin: 30px 0 15px 0; color: #333; }
+        
+        .results-table { width: 100%; border-collapse: collapse; }
         .results-table th { text-align: left; border-bottom: 2px solid #333; padding: 12px 8px; font-size: 14px; background: #eee; }
         .results-table td { border-bottom: 1px solid #ddd; padding: 15px 8px; }
         .total-amount { font-size: 18px; font-weight: bold; color: #d9534f; }
+        .detail-text { font-size: 12px; color: #666; white-space: pre-wrap; }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>保険 総支払シミュレーション</h1>
     <div class="input-section">
-        <label>保険開始年齢</label><input type="number" id="startAge" value="5" min="0" max="16">
+        <label>保険開始年齢</label><input type="number" id="startAge" value="5" min="1" max="16">
         <div></div><div></div>
         <label>通院回数</label><input type="number" id="numVisits" value="10">
         <label>通院費用</label><input type="number" id="costVisit" value="6000">
@@ -37,6 +42,9 @@
             <button class="start-btn" id="startBtn">Start</button>
         </div>
     </div>
+
+    <div class="ranking-title">ランキング</div>
+    
     <table class="results-table">
         <thead>
             <tr>
@@ -49,7 +57,7 @@
             </tr>
         </thead>
         <tbody id="rankingBody">
-            <tr><td colspan="6" style="text-align:center; padding: 40px; color: #999;">Startボタンを押してください</td></tr>
+            <tr><td colspan="6" style="text-align:center; padding: 40px; color: #999;">Startボタンを押して集計を開始してください</td></tr>
         </tbody>
     </table>
 </div>
@@ -58,46 +66,50 @@
     const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSwgCvHlDl6YtpEX9b1n_nNYQU-i0FVhoE7U90dHXe_q9cbJjUmZSMpxTZtDTwqRO7UBrElKMZCSP2a/pub?gid=1826550484&single=true&output=csv';
 
     document.getElementById('startBtn').addEventListener('click', async () => {
-        const startAge = parseInt(document.getElementById('startAge').value) || 0;
+        const startAge = parseInt(document.getElementById('startAge').value) || 1;
         const btn = document.getElementById('startBtn');
         btn.innerText = "計算中...";
-
+        
         try {
             const response = await fetch(`${CSV_URL}&t=${Date.now()}`);
             const text = await response.text();
             const rows = text.split(/\r?\n/).map(row => row.split(',').map(c => c.replace(/^"|"$/g, '').trim()));
             
-            // スプレッドシートの列定義
-            // R列(17)が0歳、S列(18)が1歳... AH列(33)が16歳
             const data = rows.slice(1).filter(r => r[2]).map(r => {
                 const parseNum = (val) => parseInt(val?.replace(/[^0-9]/g, '')) || 0;
                 
-                // 生涯保険料の再計算: 開始年齢から16歳までの合計を算出
-                let lifePremium = 0;
-                for (let age = startAge; age <= 16; age++) {
-                    const colIndex = 17 + age; // R列(17) + 年齢
-                    lifePremium += parseNum(r[colIndex]);
-                }
-
-                // 自己負担額はスプレッドシートのF列(5)を一旦基準にする
-                // ※本来は入力値(通院回数等)に応じた計算が必要ですが、まずは年齢連動を優先
+                // --- 生涯保険料の参照列選択 ---
+                // 開始年齢 1 = G列(インデックス 6)
+                // 開始年齢 2 = H列(インデックス 7)
+                // ...
+                // 開始年齢 16 = V列(インデックス 21)
+                // 計算式: 5 + startAge
+                const premiumColIndex = 5 + startAge;
+                const premium = parseNum(r[premiumColIndex]);
+                
+                // 自己負担: F列(インデックス 5)
                 const selfPay = parseNum(r[5]); 
-                const totalPay = lifePremium + selfPay;
+                
+                // 総支払合計 = 選択した列の生涯保険料 + F列の自己負担
+                const totalPay = premium + selfPay;
 
                 return {
-                    name: r[2],
-                    ratio: r[1],
+                    name: r[2],       // C列
+                    ratio: r[1],      // B列
                     totalPay: totalPay,
-                    premium: lifePremium,
+                    premium: premium,
                     selfPay: selfPay,
-                    detail: r[6] || ""
+                    detail: r[22] || "" // W列以降に詳細がある場合は適宜変更してください。画像ではV列の次はW列(22)です。
                 };
-            }).filter(p => p.premium > 0);
+            }).filter(p => p.name);
 
+            // 総支払合計の昇順でソート
             data.sort((a, b) => a.totalPay - b.totalPay);
+
             render(data);
         } catch (e) {
-            alert("エラーが発生しました。");
+            console.error(e);
+            alert("データの取得に失敗しました。");
         } finally {
             btn.innerText = "Start";
         }
@@ -106,12 +118,12 @@
     function render(data) {
         document.getElementById('rankingBody').innerHTML = data.map((p, i) => `
             <tr>
-                <td style="font-weight:bold; color:#666; text-align:center;">${i + 1}</td>
-                <td><b>${p.name}</b><br><small>補償:${p.ratio}%</small></td>
+                <td style="text-align:center; font-weight:bold; color:#666;">${i + 1}</td>
+                <td><b>${p.name}</b><br><small>補償比例: ${p.ratio}%</small></td>
                 <td><span class="total-amount">${p.totalPay.toLocaleString()}円</span></td>
                 <td>${p.premium.toLocaleString()}円</td>
                 <td>${p.selfPay.toLocaleString()}円</td>
-                <td style="font-size:12px; color:#666;">${p.detail}</td>
+                <td><div class="detail-text">${p.detail}</div></td>
             </tr>
         `).join('');
     }
