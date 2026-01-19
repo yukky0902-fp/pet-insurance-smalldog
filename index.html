@@ -19,7 +19,7 @@
         .rank-num { font-size: 20px; font-weight: bold; color: #666; text-align: center; }
         .plan-name { font-size: 16px; font-weight: bold; color: #0056b3; }
         .total-amount { font-size: 18px; font-weight: bold; color: #d9534f; }
-        .error-message { color: #d9534f; padding: 15px; background: #fff5f5; border: 1px solid #d9534f; margin-top: 15px; border-radius: 5px; display: none; }
+        .detail-text { font-size: 12px; color: #666; line-height: 1.4; }
     </style>
 </head>
 <body>
@@ -38,22 +38,21 @@
         <label>手術費用</label><input type="number" id="costSurg" value="200000">
         <div class="button-container">
             <button class="start-btn" id="startBtn">Start</button>
-            <div id="errorMessage" class="error-message"></div>
         </div>
     </div>
     <table class="results-table">
         <thead>
             <tr>
-                <th>順位</th>
-                <th>保険名(C列)</th>
-                <th>総支払合計(BA列)</th>
-                <th>生涯保険料(AJ列)</th>
-                <th>自己負担(AX列)</th>
-                <th>詳細(J列)</th>
+                <th style="width: 5%;">順位</th>
+                <th style="width: 25%;">保険名(C列)</th>
+                <th style="width: 18%;">総支払合計(D列)</th>
+                <th style="width: 18%;">生涯保険料(E列)</th>
+                <th style="width: 15%;">自己負担(F列)</th>
+                <th style="width: 19%;">詳細(G列)</th>
             </tr>
         </thead>
         <tbody id="rankingBody">
-            <tr><td colspan="6" style="text-align:center; padding: 40px; color: #999;">Startボタンを押してください</td></tr>
+            <tr><td colspan="6" style="text-align:center; padding: 40px; color: #999;">Startボタンを押して集計を開始してください</td></tr>
         </tbody>
     </table>
 </div>
@@ -63,53 +62,51 @@
 
     document.getElementById('startBtn').addEventListener('click', async () => {
         const btn = document.getElementById('startBtn');
-        btn.innerText = "読込中...";
+        btn.innerText = "データ取得中...";
+        
         try {
             const response = await fetch(`${CSV_URL}&t=${Date.now()}`);
             const text = await response.text();
+            // CSVを解析
             const rows = text.split(/\r?\n/).map(row => row.split(',').map(c => c.replace(/^"|"$/g, '').trim()));
             
-            const header = rows[0];
-            // 列番号を「列名」から自動取得
-            const idx = {
-                name: 2,  // C列: 保険名
-                ratio: 1, // B列: 割合
-                total: 52, // BA列
-                premium: 35, // AJ列
-                self: 49, // AX列
-                detail: 9 // J列
-            };
-
-            const data = rows.slice(1).filter(r => r[idx.name] && r[idx.total]).map(r => {
+            // 最新のスプレッドシート構造 に基づくインデックス
+            const data = rows.slice(1).filter(r => r[2]).map(r => {
                 const parseNum = (val) => parseInt(val?.replace(/[^0-9]/g, '')) || 0;
                 return {
-                    name: r[idx.name],
-                    ratio: r[idx.ratio],
-                    totalPay: parseNum(r[idx.total]),
-                    premium: parseNum(r[idx.premium]),
-                    selfPay: parseNum(r[idx.self]),
-                    detail: r[idx.detail] || ""
+                    name: r[2],           // C列: Insurance name
+                    ratio: r[1],          // B列: Com
+                    totalPay: parseNum(r[3]), // D列: Total payout (旧BA列)
+                    premium: parseNum(r[4]),  // E列: Total life insurance (旧AJ列)
+                    selfPay: parseNum(r[5]),  // F列: Total self-pay (旧AX列)
+                    detail: r[6] || ""     // G列: Item name (旧J列)
                 };
-            }).filter(p => p.totalPay > 100); // 異常に低い数値(0, 1円等)を除外
+            }).filter(p => p.totalPay > 0);
 
+            // 総支払合計(D列)の少ない順に並び替え
             data.sort((a, b) => a.totalPay - b.totalPay);
+
             render(data);
         } catch (e) {
-            alert("エラーが発生しました");
+            alert("エラー: データの読み込みに失敗しました。公開設定を確認してください。");
         } finally {
             btn.innerText = "Start";
         }
     });
 
     function render(data) {
-        document.getElementById('rankingBody').innerHTML = data.map((p, i) => `
+        const tbody = document.getElementById('rankingBody');
+        tbody.innerHTML = data.map((p, index) => `
             <tr>
-                <td class="rank-num">${i + 1}</td>
-                <td><div class="plan-name">${p.name}</div><div style="font-size:11px;color:#888;">補償:${p.ratio}%</div></td>
+                <td class="rank-num">${index + 1}</td>
+                <td>
+                    <div class="plan-name">${p.name}</div>
+                    <div style="font-size:11px;color:#888;">補償比例: ${p.ratio}%</div>
+                </td>
                 <td><div class="total-amount">${p.totalPay.toLocaleString()}円</div></td>
                 <td>${p.premium.toLocaleString()}円</td>
                 <td>${p.selfPay.toLocaleString()}円</td>
-                <td><div style="font-size:12px;">${p.detail}</div></td>
+                <td><div class="detail-text">${p.detail}</div></td>
             </tr>
         `).join('');
     }
