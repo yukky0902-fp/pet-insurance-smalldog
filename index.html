@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ペット保険シミュレーション</title>
+    <title>ペット保険 総支払シミュレーション</title>
     <style>
         body { font-family: sans-serif; margin: 20px; background-color: #fff; color: #333; }
         .container { max-width: 950px; margin: auto; }
@@ -49,40 +49,41 @@
 </div>
 
 <script>
-    // image_05826b.pngに表示されていた公開用CSVの直リンク
+    // image_05826b.png で確認した「plans」シートの公開用URLに固定
     const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSwgCvHIDI6YtpEX9b1n_nNYQU-iOFVhoE7U9OdHXe_q9cbJjumZSMpxTZtDTwqRO7UBRElKMZCSP2a/pub?gid=1826550484&single=true&output=csv';
 
     document.getElementById('startBtn').addEventListener('click', async () => {
         const btn = document.getElementById('startBtn');
         const err = document.getElementById('errorMsg');
         btn.disabled = true;
-        btn.innerText = "データ読込中...";
+        btn.innerText = "読込中...";
         err.style.display = "none";
 
         try {
-            // fetchの第2引数に mode: 'cors' を指定せず、ブラウザのキャッシュを回避
+            // キャッシュによるエラーを防ぐため、URLにタイムスタンプを付与して取得
             const response = await fetch(`${CSV_URL}&t=${Date.now()}`);
             if (!response.ok) throw new Error("データの取得に失敗しました。");
             
             const text = await response.text();
-            // CSV解析
+            // 改行とカンマで分割して配列化
             const rows = text.split(/\r?\n/).map(row => row.split(',').map(c => c.replace(/^"|"$/g, '').trim()));
             
-            // B列=割合, C列=名前, D列=免責, T列(index19)以降=保険料
+            // image_05826b.png のシート構造（B列=割合, C列=名前, D列=免責, T列付近=保険料）に合わせて抽出
             const insuranceData = rows.slice(1).filter(r => r[2]).map(r => ({
                 name: r[2], 
                 ratio: parseFloat(r[1]) / 100 || 0,
                 deductible: parseFloat(r[3].replace(/[^0-9]/g, '')) || 0,
-                // 保険料列(T列〜AI列想定)から数値のみ抽出
+                // 保険料データが含まれる列（T列〜）から数値を抽出
                 premiums: r.slice(19, 35).map(v => parseFloat(v.replace(/[^0-9]/g, '')) || 0)
             }));
 
-            if (insuranceData.length === 0) throw new Error("表示できるデータがありません。");
+            if (insuranceData.length === 0) throw new Error("有効なデータが見つかりませんでした。");
             calculate(insuranceData);
             
         } catch (e) {
-            err.innerText = "エラー: " + e.message + "。スプレッドシートがCSV形式で公開されているか再確認してください。";
+            err.innerText = "エラー: " + e.message;
             err.style.display = "block";
+            console.error(e);
         } finally {
             btn.disabled = false;
             btn.innerText = "Start";
@@ -104,7 +105,7 @@
 
         const results = data.map(plan => {
             let totalPrem = 0;
-            // 開始年齢から16歳までの保険料を合算
+            // 指定年齢から16歳までの保険料を合算
             for (let i = startAge - 1; i < plan.premiums.length; i++) {
                 totalPrem += plan.premiums[i]; 
             }
