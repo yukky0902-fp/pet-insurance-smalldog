@@ -3,24 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>保険 総支払シミュレーション</title>
+    <title>ペット保険 総支払シミュレーション</title>
     <style>
         body { font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif; margin: 20px; background-color: #f5f7fa; color: #333; }
         .container { max-width: 1000px; margin: auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { font-size: 20px; border-left: 5px solid #007bff; padding-left: 15px; margin-bottom: 25px; }
+        
+        /* 入力エリア */
         .input-section { display: grid; grid-template-columns: 150px 120px 150px 120px; gap: 15px; margin-bottom: 30px; align-items: center; background: #f8f9fa; padding: 20px; border-radius: 8px; }
         label { font-size: 14px; font-weight: bold; }
         input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; text-align: right; width: 100px; font-size: 16px; }
+        
         .button-container { grid-column: 1 / 5; text-align: center; margin-top: 10px; }
-        .start-btn { background-color: #007bff; color: white; border: none; padding: 12px 60px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; }
-        .start-btn:disabled { background-color: #ccc; }
+        .start-btn { background-color: #007bff; color: white; border: none; padding: 12px 60px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; transition: 0.2s; }
+        .start-btn:hover { background-color: #0056b3; }
+        .start-btn:disabled { background-color: #ccc; cursor: not-allowed; }
+
+        /* テーブル */
         .results-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         .results-table th { text-align: left; border-bottom: 2px solid #333; padding: 12px 8px; font-size: 14px; background: #eee; }
         .results-table td { border-bottom: 1px solid #ddd; padding: 15px 8px; }
+
         .plan-name { font-size: 18px; font-weight: bold; color: #0056b3; }
         .total-amount { font-size: 20px; font-weight: bold; color: #d9534f; }
         .badge-info { font-size: 12px; color: #555; background: #e9ecef; padding: 3px 8px; border-radius: 4px; border: 1px solid #ced4da; }
-        .error-message { color: #d9534f; padding: 15px; background: #fff5f5; border: 1px solid #d9534f; margin-top: 15px; border-radius: 5px; display: none; }
+        
+        .error-message { color: #d9534f; padding: 15px; background: #fff5f5; border: 1px solid #d9534f; margin-top: 15px; border-radius: 5px; display: none; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -29,16 +37,22 @@
     <h1>保険 総支払シミュレーション</h1>
 
     <div class="input-section">
-        <label>保険開始年齢</label><input type="number" id="startAge" value="5" min="1" max="16">
+        <label>保険開始年齢</label>
+        <input type="number" id="startAge" value="5" min="1" max="16">
         <div></div><div></div>
+
         <label>通院回数</label><input type="number" id="numVisits" value="10">
         <label>通院費用</label><input type="number" id="costVisit" value="6000">
+
         <label>検査回数</label><input type="number" id="numTests" value="1">
         <label>検査費用</label><input type="number" id="costTest" value="150000">
+
         <label>入院回数</label><input type="number" id="numHosp" value="10">
         <label>入院費用</label><input type="number" id="costHosp" value="10000">
+
         <label>手術回数</label><input type="number" id="numSurg" value="1">
         <label>手術費用</label><input type="number" id="costSurg" value="200000">
+
         <div class="button-container">
             <button class="start-btn" id="startBtn">Start</button>
             <div id="errorMessage" class="error-message"></div>
@@ -62,38 +76,48 @@
 </div>
 
 <script>
-    // 画像 image_05826b.png から正確に書き起こしたURL
-    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSwgCvHIDI6YtpEX9b1n_nNYQU-iOFVhoE7U9OdHXe_q9cbJjumZSMpxTZtDTwqRO7UBRElKMZCSP2a/pub?gid=1826550484&single=true&output=csv';
+    // ご提示いただいたテキストURLをそのまま使用
+    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSwgCvHlDl6YtpEX9b1n_nNYQU-i0FVhoE7U90dHXe_q9cbJjUmZSMpxTZtDTwqRO7UBrElKMZCSP2a/pub?gid=1826550484&single=true&output=csv';
 
     document.getElementById('startBtn').addEventListener('click', async () => {
         const btn = document.getElementById('startBtn');
         const errDiv = document.getElementById('errorMessage');
+        const tbody = document.getElementById('rankingBody');
+        
         btn.innerText = "データ読込中...";
         btn.disabled = true;
         errDiv.style.display = "none";
 
         try {
-            const response = await fetch(`${CSV_URL}&t=${Date.now()}`);
-            if (!response.ok) throw new Error("データの取得に失敗しました。URLまたは公開設定を確認してください。");
+            // fetchの際にキャッシュを無視させるため、ダミーパラメータを付与
+            const response = await fetch(`${CSV_URL}&cachebuster=${Date.now()}`);
+            if (!response.ok) throw new Error("スプレッドシートへのアクセスに失敗しました。URLが正しいか、再度確認してください。");
             
             const text = await response.text();
-            const rows = text.split(/\r?\n/).map(row => row.split(',').map(c => c.replace(/^"|"$/g, '').trim()));
             
-            // スプレッドシートの列構造に基づいてデータを抽出
+            // CSV解析
+            const rows = text.split(/\r?\n/).map(row => {
+                // カンマ区切りだが、引用符内のカンマを考慮しない簡易版（シート構造が単純な場合）
+                return row.split(',').map(c => c.replace(/^"|"$/g, '').trim());
+            });
+
+            // ヘッダーを除外してデータをマッピング
             const insuranceData = rows.slice(1).filter(r => r[2]).map(r => ({
                 name: r[2],       // C列: 保険名
-                ratio: parseFloat(r[1]) / 100 || 0, // B列: 割合
+                ratio: parseFloat(r[1]) / 100 || 0, // B列: 補償割合
                 deductible: parseFloat(r[3].replace(/[^0-9]/g, '')) || 0, // D列: 免責
-                // T列(20列目)付近からの保険料を配列として取得
+                // 年齢別保険料（T列付近から16回分を想定）
                 premiums: r.slice(19, 35).map(v => parseFloat(v.replace(/[^0-9]/g, '')) || 0)
             }));
 
-            if (insuranceData.length === 0) throw new Error("有効なデータが見つかりませんでした。");
+            if (insuranceData.length === 0) throw new Error("有効な保険データが見つかりませんでした。シートの中身を確認してください。");
+            
             calculate(insuranceData);
             
         } catch (error) {
             errDiv.innerText = "エラー: " + error.message;
             errDiv.style.display = "block";
+            console.error("Fetch Error:", error);
         } finally {
             btn.innerText = "Start";
             btn.disabled = false;
@@ -102,7 +126,7 @@
 
     function calculate(data) {
         const startAge = parseInt(document.getElementById('startAge').value) || 1;
-        const v = {
+        const inputs = {
             nv: parseInt(document.getElementById('numVisits').value) || 0,
             cv: parseInt(document.getElementById('costVisit').value) || 0,
             nt: parseInt(document.getElementById('numTests').value) || 0,
@@ -114,35 +138,44 @@
         };
 
         const results = data.map(plan => {
+            // 生涯保険料合計
             let totalPremium = 0;
             for (let i = startAge - 1; i < plan.premiums.length; i++) {
                 totalPremium += plan.premiums[i];
             }
 
-            const calcSelfPay = (cost, count) => {
+            // 自己負担計算: (費用 - 免責) * (1 - 割合)
+            const calc = (cost, count) => {
                 if (count <= 0 || cost <= 0) return 0;
                 let single = (cost - plan.deductible) * (1 - plan.ratio);
                 return Math.max(0, Math.round(single * count));
             };
 
-            const totalSelfPay = calcSelfPay(v.cv, v.nv) + calcSelfPay(v.ct, v.nt) + calcSelfPay(v.ch, v.nh) + calcSelfPay(v.cs, v.ns);
+            const totalSelfPay = calc(inputs.cv, inputs.nv) + calc(inputs.ct, inputs.nt) + 
+                               calc(inputs.ch, inputs.nh) + calc(inputs.cs, inputs.ns);
 
-            return { ...plan, totalPremium, totalSelfPay, totalPayment: totalPremium + totalSelfPay };
+            return {
+                ...plan,
+                totalPremium,
+                totalSelfPay,
+                totalPayment: totalPremium + totalSelfPay
+            };
         });
 
+        // 安い順にソート
         results.sort((a, b) => a.totalPayment - b.totalPayment);
         render(results);
     }
 
     function render(data) {
         const tbody = document.getElementById('rankingBody');
-        tbody.innerHTML = data.map(p => `
+        tbody.innerHTML = data.map(plan => `
             <tr>
-                <td><div class="plan-name">${p.name}</div><div style="font-size:12px;color:#666;">補償:${p.ratio*100}%</div></td>
-                <td><div class="total-amount">${p.totalPayment.toLocaleString()}円</div></td>
-                <td>${p.totalPremium.toLocaleString()}円</td>
-                <td>${p.totalSelfPay.toLocaleString()}円</td>
-                <td><span class="badge-info">免責:${p.deductible.toLocaleString()}円</span></td>
+                <td><div class="plan-name">${plan.name}</div><div style="font-size:12px;color:#666;">補償:${plan.ratio*100}%</div></td>
+                <td><div class="total-amount">${plan.totalPayment.toLocaleString()}円</div></td>
+                <td>${plan.totalPremium.toLocaleString()}円</td>
+                <td>${plan.totalSelfPay.toLocaleString()}円</td>
+                <td><span class="badge-info">免責:${plan.deductible.toLocaleString()}円</span></td>
             </tr>
         `).join('');
     }
