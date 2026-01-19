@@ -3,22 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>保険 総支払シミュレーション</title>
+    <title>ペット保険 総支払シミュレーション</title>
     <style>
         body { font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif; margin: 20px; background-color: #f5f7fa; color: #333; }
         .container { max-width: 1000px; margin: auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { font-size: 20px; border-left: 5px solid #007bff; padding-left: 15px; margin-bottom: 25px; }
         
-        /* 入力エリアのスタイル */
         .input-section { display: grid; grid-template-columns: 150px 120px 150px 120px; gap: 15px; margin-bottom: 30px; align-items: center; background: #f8f9fa; padding: 20px; border-radius: 8px; }
         label { font-size: 14px; font-weight: bold; }
         input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; text-align: right; width: 100px; font-size: 16px; }
         
         .button-container { grid-column: 1 / 5; text-align: center; margin-top: 10px; }
-        .start-btn { background-color: #007bff; color: white; border: none; padding: 12px 60px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; }
-        .start-btn:disabled { background-color: #ccc; }
+        .start-btn { background-color: #007bff; color: white; border: none; padding: 12px 60px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; transition: 0.2s; }
+        .start-btn:hover { background-color: #0056b3; }
+        .start-btn:disabled { background-color: #ccc; cursor: not-allowed; }
 
-        /* 結果テーブルのスタイル */
         .results-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         .results-table th { text-align: left; border-bottom: 2px solid #333; padding: 12px 8px; font-size: 14px; background: #eee; }
         .results-table td { border-bottom: 1px solid #ddd; padding: 15px 8px; }
@@ -27,8 +26,7 @@
         .total-amount { font-size: 20px; font-weight: bold; color: #d9534f; }
         .badge-info { font-size: 12px; color: #555; background: #e9ecef; padding: 3px 8px; border-radius: 4px; border: 1px solid #ced4da; }
         
-        /* エラー表示エリア */
-        .error-message { color: #d9534f; padding: 15px; background: #fff5f5; border: 1px solid #d9534f; margin-top: 15px; border-radius: 5px; display: none; }
+        .error-message { color: #d9534f; padding: 15px; background: #fff5f5; border: 1px solid #d9534f; margin-top: 15px; border-radius: 5px; display: none; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -82,26 +80,35 @@
     document.getElementById('startBtn').addEventListener('click', async () => {
         const btn = document.getElementById('startBtn');
         const errDiv = document.getElementById('errorMessage');
-        btn.innerText = "データ読込中...";
+        btn.innerText = "読込中...";
         btn.disabled = true;
         errDiv.style.display = "none";
 
         try {
-            // ブラウザのキャッシュを回避するためタイムスタンプを付与
-            const response = await fetch(`${CSV_URL}&t=${Date.now()}`);
+            // キャッシュ対策
+            const response = await fetch(`${CSV_URL}&cache=${Date.now()}`);
             if (!response.ok) throw new Error("データの取得に失敗しました。URLまたは公開設定を確認してください。");
             
             const text = await response.text();
             const rows = text.split(/\r?\n/).map(row => row.split(',').map(c => c.replace(/^"|"$/g, '').trim()));
             
-            // スプレッドシートの構造からデータを抽出
-            // B列(1):割合, C列(2):名, D列(3):免責, T列(19)〜AI列(34):1~16歳保険料
-            const insuranceData = rows.slice(1).filter(r => r[2]).map(r => ({
-                name: r[2], 
-                ratio: (parseFloat(r[1].replace(/[^0-9.]/g, '')) || 0) / 100,
-                deductible: parseFloat(r[3].replace(/[^0-9]/g, '')) || 0,
-                premiums: r.slice(19, 35).map(v => parseFloat(v.replace(/[^0-9]/g, '')) || 0)
-            }));
+            // データ掃除（空行や計算不能な行を除外）
+            const insuranceData = rows.slice(1).filter(r => r[2] && r[2].length > 0).map(r => {
+                // 文字列から数字だけを取り出す関数
+                const cleanNum = (val) => {
+                    if (!val) return 0;
+                    const n = parseFloat(val.toString().replace(/[^0-9.]/g, ''));
+                    return isNaN(n) ? 0 : n;
+                };
+
+                return {
+                    name: r[2], 
+                    ratio: cleanNum(r[1]) / 100,
+                    deductible: cleanNum(r[3]),
+                    // T列(index 19)以降の保険料を数値化
+                    premiums: r.slice(19, 35).map(v => cleanNum(v))
+                };
+            }).filter(p => p.premiums.some(val => val > 0)); // 保険料が設定されているものだけ
 
             if (insuranceData.length === 0) throw new Error("計算可能なデータが見つかりませんでした。");
             
@@ -110,6 +117,7 @@
         } catch (error) {
             errDiv.innerText = "エラー: " + error.message;
             errDiv.style.display = "block";
+            console.error(error);
         } finally {
             btn.innerText = "Start";
             btn.disabled = false;
@@ -130,13 +138,13 @@
         };
 
         const results = data.map(plan => {
-            // 生涯保険料合計
+            // 生涯保険料
             let totalPremium = 0;
             for (let i = startAge - 1; i < plan.premiums.length; i++) {
                 totalPremium += plan.premiums[i];
             }
 
-            // 自己負担計算
+            // 自己負担
             const calc = (cost, count) => {
                 if (count <= 0 || cost <= 0) return 0;
                 let single = (cost - plan.deductible) * (1 - plan.ratio);
@@ -148,7 +156,6 @@
             return { ...plan, totalPremium, totalSelfPay, totalPayment: totalPremium + totalSelfPay };
         });
 
-        // 安い順にソート
         results.sort((a, b) => a.totalPayment - b.totalPayment);
         render(results);
     }
