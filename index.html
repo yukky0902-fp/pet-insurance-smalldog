@@ -7,28 +7,38 @@
         body { font-family: "Helvetica Neue", Arial, sans-serif; margin: 20px; background-color: #f5f7fa; color: #333; }
         .container { max-width: 1250px; margin: auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { font-size: 20px; border-left: 5px solid #007bff; padding-left: 15px; margin-bottom: 25px; }
-        .input-section { display: grid; grid-template-columns: 180px 120px 180px 120px; gap: 15px; margin-bottom: 30px; align-items: center; background: #f8f9fa; padding: 20px; border-radius: 8px; }
+        
+        /* セクション区切りテキスト */
+        .section-divider { border-bottom: 1px dashed #0000ff; color: #333; font-size: 14px; margin: 15px 0; padding-bottom: 3px; font-weight: bold; }
+        
+        .input-section { display: grid; grid-template-columns: 180px 120px 180px 120px; gap: 15px; margin-bottom: 20px; align-items: center; background: #f8f9fa; padding: 20px; border-radius: 8px; }
         label { font-size: 14px; font-weight: bold; }
         input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; text-align: right; width: 100px; font-size: 16px; }
         .button-container { grid-column: 1 / 5; text-align: center; margin-top: 10px; }
         .start-btn { background-color: #007bff; color: white; border: none; padding: 12px 60px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; }
-        .ranking-title { font-size: 20px; font-weight: bold; margin: 30px 0 15px 0; color: #333; }
         
-        /* テーブルのスタイル調整 */
         .results-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 10px; }
         .results-table th { text-align: center; border-bottom: 2px solid #333; padding: 12px 5px; background: #f2f2f2; white-space: nowrap; }
         .results-table td { border-bottom: 1px solid #ddd; padding: 12px 5px; text-align: center; vertical-align: middle; }
         .name-cell { text-align: left !important; min-width: 180px; }
         .total-amount { font-size: 16px; font-weight: bold; color: #d9534f; }
-        .symbol-cell { font-size: 16px; } /* ○や×を少し大きく */
+        
+        /* 月払い表示用 */
+        .monthly-pay { color: #0000ff; font-size: 12px; margin-top: 4px; display: block; font-weight: normal; }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>保険 総支払シミュレーション</h1>
+
+    <div class="section-divider">入力欄------------------------------------------------------------</div>
     <div class="input-section">
         <label>保険開始年齢</label><input type="number" id="startAge" value="1" min="1" max="16">
         <div></div><div></div>
+    </div>
+
+    <div class="section-divider">現在入力不可(下記数値を計算で使用)------------------------------</div>
+    <div class="input-section">
         <label>通院回数</label><input type="number" id="numVisits" value="10">
         <label>通院費用</label><input type="number" id="costVisit" value="6000">
         <label>検査回数</label><input type="number" id="numTests" value="1">
@@ -42,7 +52,7 @@
         </div>
     </div>
 
-    <div class="ranking-title">ランキング</div>
+    <h2 style="font-size: 18px; margin-top: 30px;">ランキング</h2>
     
     <table class="results-table">
         <thead>
@@ -82,15 +92,22 @@
             const data = rows.slice(1).filter(r => r[2]).map(r => {
                 const parseNum = (val) => parseInt(val?.replace(/[^0-9]/g, '')) || 0;
                 
-                const premium = parseNum(r[5 + startAge]); // G列(6)〜V列(21)
-                const selfPay = parseNum(r[5]);           // F列(5)
+                // 生涯保険料: G列(6)〜
+                const premium = parseNum(r[5 + startAge]);
+                // 自己負担: F列(5)
+                const selfPay = parseNum(r[5]); 
+
+                // 月払い: 1=AJ(35), 2=AK(36)...
+                const monthlyColIndex = 34 + startAge;
+                const monthlyPay = parseNum(r[monthlyColIndex]);
 
                 return {
-                    name: r[2],         // C列
-                    ratio: r[1],        // B列
+                    name: r[2],       // C列
+                    ratio: r[1],      // B列
                     totalPay: premium + selfPay,
                     premium: premium,
                     selfPay: selfPay,
+                    monthlyPay: monthlyPay,
                     mado: r[22] || "-",    // W列
                     hernia: r[23] || "-",  // X列
                     shika: r[25] || "-",   // Z列
@@ -103,7 +120,7 @@
             data.sort((a, b) => a.totalPay - b.totalPay);
             render(data);
         } catch (e) {
-            alert("データの読み込みに失敗しました。");
+            alert("エラーが発生しました。");
         } finally {
             btn.innerText = "Start";
         }
@@ -114,13 +131,16 @@
             <tr>
                 <td style="font-weight:bold;">${i + 1}</td>
                 <td class="name-cell"><b>${p.name}</b><br><small>補償割合:${p.ratio}%</small></td>
-                <td><span class="total-amount">${p.totalPay.toLocaleString()}円</span></td>
+                <td>
+                    <span class="total-amount">${p.totalPay.toLocaleString()}円</span><br>
+                    <span class="monthly-pay">開始年齢時の月払い<br>${p.monthlyPay.toLocaleString()}</span>
+                </td>
                 <td>${p.premium.toLocaleString()}円</td>
                 <td>${p.selfPay.toLocaleString()}円</td>
-                <td class="symbol-cell">${p.mado}</td>
-                <td class="symbol-cell">${p.hernia}</td>
-                <td class="symbol-cell">${p.shika}</td>
-                <td class="symbol-cell">${p.shiseki}</td>
+                <td>${p.mado}</td>
+                <td>${p.hernia}</td>
+                <td>${p.shika}</td>
+                <td>${p.shiseki}</td>
                 <td>${p.menseki}</td>
                 <td>${p.limitAge}${p.limitAge !== "-" ? "歳" : ""}</td>
             </tr>
