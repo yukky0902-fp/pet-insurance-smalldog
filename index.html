@@ -5,7 +5,7 @@
     <title>ペット保険 総支払シミュレーション</title>
     <style>
         body { font-family: "Helvetica Neue", Arial, sans-serif; margin: 20px; background-color: #f5f7fa; color: #333; }
-        .container { max-width: 1200px; margin: auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .container { max-width: 1250px; margin: auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { font-size: 20px; border-left: 5px solid #007bff; padding-left: 15px; margin-bottom: 25px; }
         .input-section { display: grid; grid-template-columns: 180px 120px 180px 120px; gap: 15px; margin-bottom: 30px; align-items: center; background: #f8f9fa; padding: 20px; border-radius: 8px; }
         label { font-size: 14px; font-weight: bold; }
@@ -14,12 +14,13 @@
         .start-btn { background-color: #007bff; color: white; border: none; padding: 12px 60px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; }
         .ranking-title { font-size: 20px; font-weight: bold; margin: 30px 0 15px 0; color: #333; }
         
-        .results-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        .results-table th { text-align: center; border-bottom: 2px solid #333; padding: 12px 5px; background: #eee; white-space: nowrap; }
-        .results-table td { border-bottom: 1px solid #ddd; padding: 15px 5px; text-align: center; }
+        /* テーブルのスタイル調整 */
+        .results-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 10px; }
+        .results-table th { text-align: center; border-bottom: 2px solid #333; padding: 12px 5px; background: #f2f2f2; white-space: nowrap; }
+        .results-table td { border-bottom: 1px solid #ddd; padding: 12px 5px; text-align: center; vertical-align: middle; }
         .name-cell { text-align: left !important; min-width: 180px; }
         .total-amount { font-size: 16px; font-weight: bold; color: #d9534f; }
-        .status-icon { font-weight: bold; }
+        .symbol-cell { font-size: 16px; } /* ○や×を少し大きく */
     </style>
 </head>
 <body>
@@ -81,31 +82,28 @@
             const data = rows.slice(1).filter(r => r[2]).map(r => {
                 const parseNum = (val) => parseInt(val?.replace(/[^0-9]/g, '')) || 0;
                 
-                // 生涯保険料: 1歳=G(6), 2歳=H(7)...
-                const premium = parseNum(r[5 + startAge]);
-                // 自己負担: F列(5)
-                const selfPay = parseNum(r[5]); 
+                const premium = parseNum(r[5 + startAge]); // G列(6)〜V列(21)
+                const selfPay = parseNum(r[5]);           // F列(5)
 
                 return {
-                    name: r[2],       // C列
-                    ratio: r[1],      // B列
+                    name: r[2],         // C列
+                    ratio: r[1],        // B列
                     totalPay: premium + selfPay,
                     premium: premium,
                     selfPay: selfPay,
-                    // 追加項目
-                    mado: r[22],      // W列(22): 窓口
-                    hernia: r[23],    // X列(23): ヘルニア
-                    shika: r[25],     // Z列(25): 歯科
-                    shiseki: r[26],   // AA列(26): 歯石
-                    menseki: r[27],   // AB列(27): 免責
-                    limitAge: r[28]   // AC列(28): 加入不可年齢
+                    mado: r[22] || "-",    // W列
+                    hernia: r[23] || "-",  // X列
+                    shika: r[25] || "-",   // Z列
+                    shiseki: r[26] || "-", // AA列
+                    menseki: r[27] || "-", // AB列
+                    limitAge: r[28] || "-" // AC列
                 };
             }).filter(p => p.name);
 
             data.sort((a, b) => a.totalPay - b.totalPay);
             render(data);
         } catch (e) {
-            alert("エラーが発生しました。");
+            alert("データの読み込みに失敗しました。");
         } finally {
             btn.innerText = "Start";
         }
@@ -119,12 +117,12 @@
                 <td><span class="total-amount">${p.totalPay.toLocaleString()}円</span></td>
                 <td>${p.premium.toLocaleString()}円</td>
                 <td>${p.selfPay.toLocaleString()}円</td>
-                <td class="status-icon">${p.mado}</td>
-                <td class="status-icon">${p.hernia}</td>
-                <td class="status-icon">${p.shika}</td>
-                <td class="status-icon">${p.shiseki}</td>
+                <td class="symbol-cell">${p.mado}</td>
+                <td class="symbol-cell">${p.hernia}</td>
+                <td class="symbol-cell">${p.shika}</td>
+                <td class="symbol-cell">${p.shiseki}</td>
                 <td>${p.menseki}</td>
-                <td>${p.limitAge}歳</td>
+                <td>${p.limitAge}${p.limitAge !== "-" ? "歳" : ""}</td>
             </tr>
         `).join('');
     }
