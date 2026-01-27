@@ -8,12 +8,17 @@
         .container { max-width: 1250px; margin: auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { font-size: 20px; border-left: 5px solid #007bff; padding-left: 15px; margin-bottom: 25px; }
         
-        /* セクション見出し（点線なし） */
         .section-label { color: #333; font-size: 14px; margin: 15px 0 5px 0; font-weight: bold; }
         
         .input-section { display: grid; grid-template-columns: 180px 120px 180px 120px; gap: 15px; margin-bottom: 20px; align-items: center; background: #f8f9fa; padding: 20px; border-radius: 8px; }
+        
+        /* フィルタセクションのスタイル */
+        .filter-section { background-color: #e7f1ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+        .filter-item { display: flex; align-items: center; font-size: 14px; font-weight: bold; cursor: pointer; }
+        .filter-item input { width: 18px; height: 18px; margin-right: 8px; cursor: pointer; }
+
         label { font-size: 14px; font-weight: bold; }
-        input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; text-align: right; width: 100px; font-size: 16px; }
+        input[type="number"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; text-align: right; width: 100px; font-size: 16px; }
         .button-container { grid-column: 1 / 5; text-align: center; margin-top: 10px; }
         .start-btn { background-color: #007bff; color: white; border: none; padding: 12px 60px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; }
         
@@ -23,9 +28,7 @@
         .name-cell { text-align: left !important; min-width: 180px; }
         .total-amount { font-size: 16px; font-weight: bold; color: #d9534f; }
         
-        /* ヘッダー内の「開始年齢時の月払い」用 */
         .header-subtext { color: #0000ff; font-size: 11px; font-weight: normal; display: block; margin-top: 2px; }
-        /* データ行の月払い数値用 */
         .monthly-value { color: #0000ff; font-size: 14px; font-weight: bold; display: block; margin-top: 4px; }
     </style>
 </head>
@@ -39,16 +42,25 @@
         <div></div><div></div>
     </div>
 
+    <div class="section-label">絞り込み条件（「○」のみ表示）</div>
+    <div class="filter-section">
+        <label class="filter-item"><input type="checkbox" class="filter-check" data-key="mado"> 窓口清算</label>
+        <label class="filter-item"><input type="checkbox" class="filter-check" data-key="hernia"> 椎間板ヘルニア</label>
+        <label class="filter-item"><input type="checkbox" class="filter-check" data-key="patera"> パテラ</label>
+        <label class="filter-item"><input type="checkbox" class="filter-check" data-key="shika"> 歯科疾病</label>
+        <label class="filter-item"><input type="checkbox" class="filter-check" data-key="shiseki"> 歯石除去</label>
+    </div>
+
     <div class="section-label">現在入力不可(下記数値を計算で使用)</div>
     <div class="input-section">
-        <label>通院回数</label><input type="number" id="numVisits" value="10">
-        <label>通院費用</label><input type="number" id="costVisit" value="6000">
-        <label>検査回数</label><input type="number" id="numTests" value="1">
-        <label>検査費用</label><input type="number" id="costTest" value="150000">
-        <label>入院回数</label><input type="number" id="numHosp" value="10">
-        <label>入院費用</label><input type="number" id="costHosp" value="10000">
-        <label>手術回数</label><input type="number" id="numSurg" value="1">
-        <label>手術費用</label><input type="number" id="costSurg" value="200000">
+        <label>通院回数</label><input type="number" id="numVisits" value="10" disabled>
+        <label>通院費用</label><input type="number" id="costVisit" value="6000" disabled>
+        <label>検査回数</label><input type="number" id="numTests" value="1" disabled>
+        <label>検査費用</label><input type="number" id="costTest" value="150000" disabled>
+        <label>入院回数</label><input type="number" id="numHosp" value="10" disabled>
+        <label>入院費用</label><input type="number" id="costHosp" value="10000" disabled>
+        <label>手術回数</label><input type="number" id="numSurg" value="1" disabled>
+        <label>手術費用</label><input type="number" id="costSurg" value="200000" disabled>
         <div class="button-container">
             <button class="start-btn" id="startBtn">Start</button>
         </div>
@@ -69,20 +81,22 @@
                 <th>自己負担</th>
                 <th>窓口</th>
                 <th>ヘルニア</th>
+                <th>パテラ</th>
                 <th>歯科</th>
                 <th>歯石</th>
                 <th>免責</th>
-                <th>加入不可年齢</th>
+                <th>加入不可</th>
             </tr>
         </thead>
         <tbody id="rankingBody">
-            <tr><td colspan="11" style="padding: 40px; text-align:center; color: #999;">Startボタンを押して集計を開始してください</td></tr>
+            <tr><td colspan="12" style="padding: 40px; text-align:center; color: #999;">Startボタンを押して集計を開始してください</td></tr>
         </tbody>
     </table>
 </div>
 
 <script>
     const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSwgCvHlDl6YtpEX9b1n_nNYQU-i0FVhoE7U90dHXe_q9cbJjUmZSMpxTZtDTwqRO7UBrElKMZCSP2a/pub?gid=1826550484&single=true&output=csv';
+    let allData = []; // 全データを保持する変数
 
     document.getElementById('startBtn').addEventListener('click', async () => {
         const startAge = parseInt(document.getElementById('startAge').value) || 1;
@@ -94,13 +108,12 @@
             const text = await response.text();
             const rows = text.split(/\r?\n/).map(row => row.split(',').map(c => c.replace(/^"|"$/g, '').trim()));
             
-            const data = rows.slice(1).filter(r => r[2]).map(r => {
+            allData = rows.slice(1).filter(r => r[2]).map(r => {
                 const parseNum = (val) => parseInt(val?.replace(/[^0-9]/g, '')) || 0;
                 
-                const premium = parseNum(r[5 + startAge]); // G列〜V列
-                const selfPay = parseNum(r[5]);           // F列
+                const premium = parseNum(r[5 + startAge]); 
+                const selfPay = parseNum(r[5]);           
 
-                // 月払い: 1=AJ(35), 2=AK(36)...
                 const monthlyColIndex = 34 + startAge;
                 const monthlyPay = parseNum(r[monthlyColIndex]);
 
@@ -113,43 +126,10 @@
                     monthlyPay: monthlyPay,
                     mado: r[22] || "-",
                     hernia: r[23] || "-",
+                    patera: r[24] || "-",
                     shika: r[25] || "-",
                     shiseki: r[26] || "-",
                     menseki: r[27] || "-",
                     limitAge: r[28] || "-"
                 };
-            }).filter(p => p.name);
-
-            data.sort((a, b) => a.totalPay - b.totalPay);
-            render(data);
-        } catch (e) {
-            alert("エラーが発生しました。");
-        } finally {
-            btn.innerText = "Start";
-        }
-    });
-
-    function render(data) {
-        document.getElementById('rankingBody').innerHTML = data.map((p, i) => `
-            <tr>
-                <td style="font-weight:bold;">${i + 1}</td>
-                <td class="name-cell"><b>${p.name}</b><br><small>補償割合:${p.ratio}%</small></td>
-                <td>
-                    <span class="total-amount">${p.totalPay.toLocaleString()}円</span>
-                    <span class="monthly-value">${p.monthlyPay.toLocaleString()}</span>
-                </td>
-                <td>${p.premium.toLocaleString()}円</td>
-                <td>${p.selfPay.toLocaleString()}円</td>
-                <td>${p.mado}</td>
-                <td>${p.hernia}</td>
-                <td>${p.shika}</td>
-                <td>${p.shiseki}</td>
-                <td>${p.menseki}</td>
-                <td>${p.limitAge}${p.limitAge !== "-" ? "歳" : ""}</td>
-            </tr>
-        `).join('');
-    }
-</script>
-</body>
-</html>
-
+            }).filter(p => p
