@@ -7,24 +7,25 @@
         body { font-family: "Helvetica Neue", Arial, sans-serif; margin: 20px; background-color: #f5f7fa; color: #333; }
         .container { max-width: 1250px; margin: auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { font-size: 20px; border-left: 5px solid #007bff; padding-left: 15px; margin-bottom: 25px; }
+        
+        /* セクション見出し（点線なし） */
         .section-label { color: #333; font-size: 14px; margin: 15px 0 5px 0; font-weight: bold; }
+        
         .input-section { display: grid; grid-template-columns: 180px 120px 180px 120px; gap: 15px; margin-bottom: 20px; align-items: center; background: #f8f9fa; padding: 20px; border-radius: 8px; }
+        label { font-size: 14px; font-weight: bold; }
+        input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; text-align: right; width: 100px; font-size: 16px; }
+        .button-container { grid-column: 1 / 5; text-align: center; margin-top: 10px; }
+        .start-btn { background-color: #007bff; color: white; border: none; padding: 12px 60px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; }
         
-        /* 絞り込み条件エリア */
-        .filter-section { background-color: #e7f1ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center; border: 1px solid #b6d4fe; }
-        .filter-item { display: flex; align-items: center; font-size: 14px; font-weight: bold; cursor: pointer; color: #004085; }
-        .filter-item input { width: 18px; height: 18px; margin-right: 8px; cursor: pointer; }
-
-        input[type="number"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; text-align: right; width: 100px; font-size: 16px; }
-        .button-container { text-align: center; margin: 20px 0; }
-        .start-btn { background-color: #007bff; color: white; border: none; padding: 12px 100px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; }
-        
-        .results-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+        .results-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 10px; }
         .results-table th { text-align: center; border-bottom: 2px solid #333; padding: 12px 5px; background: #f2f2f2; white-space: nowrap; }
         .results-table td { border-bottom: 1px solid #ddd; padding: 12px 5px; text-align: center; vertical-align: middle; }
         .name-cell { text-align: left !important; min-width: 180px; }
         .total-amount { font-size: 16px; font-weight: bold; color: #d9534f; }
+        
+        /* ヘッダー内の「開始年齢時の月払い」用 */
         .header-subtext { color: #0000ff; font-size: 11px; font-weight: normal; display: block; margin-top: 2px; }
+        /* データ行の月払い数値用 */
         .monthly-value { color: #0000ff; font-size: 14px; font-weight: bold; display: block; margin-top: 4px; }
     </style>
 </head>
@@ -34,62 +35,54 @@
 
     <div class="section-label">入力欄</div>
     <div class="input-section">
-        <label>保険開始年齢（16歳まで）</label>
-        <input type="number" id="startAge" value="1" min="1" max="16">
-    </div>
-
-    <div class="section-label">絞り込み条件（「○」のみ表示）</div>
-    <div class="filter-section">
-        <label class="filter-item"><input type="checkbox" class="filter-check" data-key="mado"> 窓口清算</label>
-        <label class="filter-item"><input type="checkbox" class="filter-check" data-key="hernia"> 椎間板ヘルニア</label>
-        <label class="filter-item"><input type="checkbox" class="filter-check" data-key="patera"> パテラ</label>
-        <label class="filter-item"><input type="checkbox" class="filter-check" data-key="shika"> 歯科疾病</label>
-        <label class="filter-item"><input type="checkbox" class="filter-check" data-key="shiseki"> 歯石除去</label>
+        <label>保険開始年齢（16歳までで計算）</label><input type="number" id="startAge" value="1" min="1" max="16">
+        <div></div><div></div>
     </div>
 
     <div class="section-label">現在入力不可(下記数値を計算で使用)</div>
     <div class="input-section">
-        <label>通院回数</label><input type="number" value="10" disabled>
-        <label>通院費用</label><input type="number" value="6000" disabled>
-        <label>検査回数</label><input type="number" value="1" disabled>
-        <label>検査費用</label><input type="number" value="150000" disabled>
-        <label>入院回数</label><input type="number" value="10" disabled>
-        <label>入院費用</label><input type="number" value="10000" disabled>
-        <label>手術回数</label><input type="number" value="1" disabled>
-        <label>手術費用</label><input type="number" value="200000" disabled>
+        <label>通院回数</label><input type="number" id="numVisits" value="10">
+        <label>通院費用</label><input type="number" id="costVisit" value="6000">
+        <label>検査回数</label><input type="number" id="numTests" value="1">
+        <label>検査費用</label><input type="number" id="costTest" value="150000">
+        <label>入院回数</label><input type="number" id="numHosp" value="10">
+        <label>入院費用</label><input type="number" id="costHosp" value="10000">
+        <label>手術回数</label><input type="number" id="numSurg" value="1">
+        <label>手術費用</label><input type="number" id="costSurg" value="200000">
+        <div class="button-container">
+            <button class="start-btn" id="startBtn">Start</button>
+        </div>
     </div>
 
-    <div class="button-container">
-        <button class="start-btn" id="startBtn">Start</button>
-    </div>
-
-    <h2 style="font-size: 18px;">ランキング</h2>
+    <h2 style="font-size: 18px; margin-top: 30px;">ランキング</h2>
+    
     <table class="results-table">
         <thead>
             <tr>
                 <th>順位</th>
                 <th>保険名(補償割合)</th>
-                <th>総支払合計<br><span class="header-subtext">開始年齢時の月払い</span></th>
+                <th>
+                    総支払合計<br>
+                    <span class="header-subtext">開始年齢時の月払い</span>
+                </th>
                 <th>生涯保険料合計</th>
                 <th>自己負担</th>
                 <th>窓口</th>
                 <th>ヘルニア</th>
-                <th>パテラ</th>
                 <th>歯科</th>
                 <th>歯石</th>
                 <th>免責</th>
-                <th>加入不可</th>
+                <th>加入不可年齢</th>
             </tr>
         </thead>
         <tbody id="rankingBody">
-            <tr><td colspan="12" style="padding: 40px; text-align:center; color: #999;">Startボタンを押して集計を開始してください</td></tr>
+            <tr><td colspan="11" style="padding: 40px; text-align:center; color: #999;">Startボタンを押して集計を開始してください</td></tr>
         </tbody>
     </table>
 </div>
 
 <script>
     const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSwgCvHlDl6YtpEX9b1n_nNYQU-i0FVhoE7U90dHXe_q9cbJjUmZSMpxTZtDTwqRO7UBrElKMZCSP2a/pub?gid=1826550484&single=true&output=csv';
-    let allData = [];
 
     document.getElementById('startBtn').addEventListener('click', async () => {
         const startAge = parseInt(document.getElementById('startAge').value) || 1;
@@ -99,87 +92,56 @@
         try {
             const response = await fetch(`${CSV_URL}&t=${Date.now()}`);
             const text = await response.text();
-            const rows = text.split(/\r?\n/).filter(l => l.trim()).map(r => r.split(',').map(c => c.replace(/^"|"$/g, '').trim()));
+            const rows = text.split(/\r?\n/).map(row => row.split(',').map(c => c.replace(/^"|"$/g, '').trim()));
             
-            allData = rows.slice(1).map(r => {
-                if (!r[2]) return null;
+            const data = rows.slice(1).filter(r => r[2]).map(r => {
+                const parseNum = (val) => parseInt(val?.replace(/[^0-9]/g, '')) || 0;
+                
+                const premium = parseNum(r[5 + startAge]); // G列〜V列
+                const selfPay = parseNum(r[5]);           // F列
 
-                const parseNum = (val) => {
-                    if (!val) return 0;
-                    const n = parseInt(val.replace(/[^0-9]/g, ''));
-                    return isNaN(n) ? 0 : n;
-                };
-
-                // 画像に基づいた新しい列指定
-                // 10番目の列（K列付近）以降に数値データがあると仮定して調整
-                const premium = parseNum(r[10 + startAge]); // 仮定：生涯保険料がK列(10)以降
-                const selfPay = parseNum(r[10]);           // 仮定：自己負担合計がK列(10)
-                const monthlyPay = parseNum(r[38 + startAge]); // 仮定：月払いがAM列(38)以降
-
-                // 記号判定
-                const checkOK = (val) => {
-                    if (!val) return "×";
-                    return (val.includes("○") || val.includes("◯") || val.includes("〇")) ? "○" : "×";
-                };
+                // 月払い: 1=AJ(35), 2=AK(36)...
+                const monthlyColIndex = 34 + startAge;
+                const monthlyPay = parseNum(r[monthlyColIndex]);
 
                 return {
-                    name: r[2],         // C列
-                    ratio: r[1],        // B列
+                    name: r[2],
+                    ratio: r[1],
                     totalPay: premium + selfPay,
                     premium: premium,
                     selfPay: selfPay,
                     monthlyPay: monthlyPay,
-                    mado: checkOK(r[4]),     // E列
-                    hernia: checkOK(r[5]),   // F列
-                    patera: checkOK(r[6]),   // G列
-                    shika: checkOK(r[7]),    // H列
-                    shiseki: checkOK(r[8]),  // I列
-                    menseki: r[3] || "-",    // D列
-                    limitAge: r[28] || "-"   // AC列
+                    mado: r[22] || "-",
+                    hernia: r[23] || "-",
+                    shika: r[25] || "-",
+                    shiseki: r[26] || "-",
+                    menseki: r[27] || "-",
+                    limitAge: r[28] || "-"
                 };
-            }).filter(p => p && p.name);
+            }).filter(p => p.name);
 
-            applyFilterAndRender();
+            data.sort((a, b) => a.totalPay - b.totalPay);
+            render(data);
         } catch (e) {
-            console.error(e);
-            alert("エラーが発生しました。コンソールを確認してください。");
+            alert("エラーが発生しました。");
         } finally {
             btn.innerText = "Start";
         }
     });
 
-    // フィルタ変更時の処理
-    document.querySelectorAll('.filter-check').forEach(c => {
-        c.addEventListener('change', () => {
-            if (allData.length > 0) applyFilterAndRender();
-        });
-    });
-
-    function applyFilterAndRender() {
-        const activeFilters = Array.from(document.querySelectorAll('.filter-check:checked')).map(el => el.dataset.key);
-        
-        const filtered = allData.filter(item => {
-            return activeFilters.every(key => item[key] === "○");
-        });
-
-        filtered.sort((a, b) => a.totalPay - b.totalPay);
-        
-        const body = document.getElementById('rankingBody');
-        if (filtered.length === 0) {
-            body.innerHTML = `<tr><td colspan="12" style="padding: 40px; text-align:center; color: #999;">条件に一致する保険がありません</td></tr>`;
-            return;
-        }
-
-        body.innerHTML = filtered.map((p, i) => `
+    function render(data) {
+        document.getElementById('rankingBody').innerHTML = data.map((p, i) => `
             <tr>
-                <td><b>${i + 1}</b></td>
+                <td style="font-weight:bold;">${i + 1}</td>
                 <td class="name-cell"><b>${p.name}</b><br><small>補償割合:${p.ratio}%</small></td>
-                <td><span class="total-amount">${p.totalPay.toLocaleString()}円</span><span class="monthly-value">${p.monthlyPay.toLocaleString()}</span></td>
+                <td>
+                    <span class="total-amount">${p.totalPay.toLocaleString()}円</span>
+                    <span class="monthly-value">${p.monthlyPay.toLocaleString()}</span>
+                </td>
                 <td>${p.premium.toLocaleString()}円</td>
                 <td>${p.selfPay.toLocaleString()}円</td>
                 <td>${p.mado}</td>
                 <td>${p.hernia}</td>
-                <td>${p.patera}</td>
                 <td>${p.shika}</td>
                 <td>${p.shiseki}</td>
                 <td>${p.menseki}</td>
