@@ -9,12 +9,16 @@
         h1 { font-size: 20px; border-left: 5px solid #007bff; padding-left: 15px; margin-bottom: 25px; }
         .section-label { color: #333; font-size: 14px; margin: 15px 0 5px 0; font-weight: bold; }
         .input-section { display: grid; grid-template-columns: 180px 120px 180px 120px; gap: 15px; margin-bottom: 20px; align-items: center; background: #f8f9fa; padding: 20px; border-radius: 8px; }
+        
+        /* 絞り込み条件エリア */
         .filter-section { background-color: #e7f1ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center; border: 1px solid #b6d4fe; }
         .filter-item { display: flex; align-items: center; font-size: 14px; font-weight: bold; cursor: pointer; color: #004085; }
         .filter-item input { width: 18px; height: 18px; margin-right: 8px; cursor: pointer; }
+
         input[type="number"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; text-align: right; width: 100px; font-size: 16px; }
         .button-container { text-align: center; margin: 20px 0; }
         .start-btn { background-color: #007bff; color: white; border: none; padding: 12px 100px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; }
+        
         .results-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
         .results-table th { text-align: center; border-bottom: 2px solid #333; padding: 12px 5px; background: #f2f2f2; white-space: nowrap; }
         .results-table td { border-bottom: 1px solid #ddd; padding: 12px 5px; text-align: center; vertical-align: middle; }
@@ -99,35 +103,90 @@
             
             allData = rows.slice(1).map(r => {
                 if (!r[2]) return null;
-                const parseNum = (val) => parseInt(val?.replace(/[^0-9]/g, '')) || 0;
-                
-                // スプレッドシートの列定義
-                const premium = parseNum(r[5 + startAge]); // G列(6)〜
-                const selfPay = parseNum(r[5]);           // F列(5)
-                const monthlyPay = parseNum(r[34 + startAge]); // AJ列(35)〜
 
-                // 記号判定の正規化（漢数字の〇や大きな◯も「○」とみなす）
-                const isOK = (val) => /^[○◯〇]$/.test(val) ? "○" : "×";
+                const parseNum = (val) => {
+                    if (!val) return 0;
+                    const n = parseInt(val.replace(/[^0-9]/g, ''));
+                    return isNaN(n) ? 0 : n;
+                };
+
+                // 画像に基づいた新しい列指定
+                // 10番目の列（K列付近）以降に数値データがあると仮定して調整
+                const premium = parseNum(r[10 + startAge]); // 仮定：生涯保険料がK列(10)以降
+                const selfPay = parseNum(r[10]);           // 仮定：自己負担合計がK列(10)
+                const monthlyPay = parseNum(r[38 + startAge]); // 仮定：月払いがAM列(38)以降
+
+                // 記号判定
+                const checkOK = (val) => {
+                    if (!val) return "×";
+                    return (val.includes("○") || val.includes("◯") || val.includes("〇")) ? "○" : "×";
+                };
 
                 return {
-                    name: r[2], ratio: r[1], totalPay: premium + selfPay,
-                    premium, selfPay, monthlyPay,
-                    mado: isOK(r[4]),     // E列
-                    hernia: isOK(r[5]),   // F列
-                    patera: isOK(r[6]),   // G列
-                    shika: isOK(r[7]),    // H列
-                    shiseki: isOK(r[8]),  // I列
-                    menseki: r[3] || "-", // D列
-                    limitAge: r[28] || "-"
+                    name: r[2],         // C列
+                    ratio: r[1],        // B列
+                    totalPay: premium + selfPay,
+                    premium: premium,
+                    selfPay: selfPay,
+                    monthlyPay: monthlyPay,
+                    mado: checkOK(r[4]),     // E列
+                    hernia: checkOK(r[5]),   // F列
+                    patera: checkOK(r[6]),   // G列
+                    shika: checkOK(r[7]),    // H列
+                    shiseki: checkOK(r[8]),  // I列
+                    menseki: r[3] || "-",    // D列
+                    limitAge: r[28] || "-"   // AC列
                 };
-            }).filter(p => p);
+            }).filter(p => p && p.name);
 
             applyFilterAndRender();
-        } catch (e) { alert("エラーが発生しました。"); }
-        finally { btn.innerText = "Start"; }
+        } catch (e) {
+            console.error(e);
+            alert("エラーが発生しました。コンソールを確認してください。");
+        } finally {
+            btn.innerText = "Start";
+        }
     });
 
-    document.querySelectorAll('.filter-check').forEach(c => c.addEventListener('change', () => allData.length && applyFilterAndRender()));
+    // フィルタ変更時の処理
+    document.querySelectorAll('.filter-check').forEach(c => {
+        c.addEventListener('change', () => {
+            if (allData.length > 0) applyFilterAndRender();
+        });
+    });
 
     function applyFilterAndRender() {
-        const activeFilters = Array.from(document.querySelectorAll
+        const activeFilters = Array.from(document.querySelectorAll('.filter-check:checked')).map(el => el.dataset.key);
+        
+        const filtered = allData.filter(item => {
+            return activeFilters.every(key => item[key] === "○");
+        });
+
+        filtered.sort((a, b) => a.totalPay - b.totalPay);
+        
+        const body = document.getElementById('rankingBody');
+        if (filtered.length === 0) {
+            body.innerHTML = `<tr><td colspan="12" style="padding: 40px; text-align:center; color: #999;">条件に一致する保険がありません</td></tr>`;
+            return;
+        }
+
+        body.innerHTML = filtered.map((p, i) => `
+            <tr>
+                <td><b>${i + 1}</b></td>
+                <td class="name-cell"><b>${p.name}</b><br><small>補償割合:${p.ratio}%</small></td>
+                <td><span class="total-amount">${p.totalPay.toLocaleString()}円</span><span class="monthly-value">${p.monthlyPay.toLocaleString()}</span></td>
+                <td>${p.premium.toLocaleString()}円</td>
+                <td>${p.selfPay.toLocaleString()}円</td>
+                <td>${p.mado}</td>
+                <td>${p.hernia}</td>
+                <td>${p.patera}</td>
+                <td>${p.shika}</td>
+                <td>${p.shiseki}</td>
+                <td>${p.menseki}</td>
+                <td>${p.limitAge}${p.limitAge !== "-" ? "歳" : ""}</td>
+            </tr>
+        `).join('');
+    }
+</script>
+</body>
+</html>
