@@ -2,24 +2,68 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>保険料推移グラフ</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: sans-serif; margin: 10px; font-size: 14px; }
+        /* 全体の基本設定 */
+        body { font-family: sans-serif; margin: 15px; font-size: 18px; line-height: 1.5; }
+        h3 { margin: 10px 0; font-size: 22px; }
+
+        /* 項目選択エリア（見やすく、スクロールしやすく） */
         #controls { 
-            margin-bottom: 10px; border: 1px solid #ccc; padding: 10px; 
-            max-height: 120px; overflow-y: auto; background: #f9f9f9;
+            margin-bottom: 20px; 
+            border: 2px solid #ddd; 
+            padding: 15px; 
+            max-height: 180px; 
+            overflow-y: auto; 
+            background: #fff;
+            border-radius: 8px;
         }
-        .checkbox-item { display: inline-block; margin-right: 12px; white-space: nowrap; margin-bottom: 5px; }
-        /* グラフの高さを画面の約1/3に調整 */
-        .chart-container { position: relative; height: 35vh; width: 95vw; }
+
+        /* チェックボックスとラベルのセット（押しやすいボタン風） */
+        .checkbox-item { 
+            display: inline-flex;
+            align-items: center;
+            margin: 5px 10px 5px 0;
+            padding: 8px 12px;
+            background: #eee;
+            border-radius: 20px;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+        }
+        .checkbox-item:hover { background: #e0e0e0; }
+        
+        /* 本物のチェックボックスを少し大きく */
+        .checkbox-item input[type="checkbox"] {
+            width: 22px;
+            height: 22px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        /* ラベルの文字を大きく */
+        .checkbox-item label {
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* グラフエリア（高さは控えめ、横幅いっぱい） */
+        .chart-container { 
+            position: relative; 
+            height: 40vh; /* 画面の約40% */
+            width: 100%; 
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
-    <h3 style="margin: 5px 0;">保険料推移グラフ</h3>
+    <h3>📊 保険料推移グラフ</h3>
     
     <div id="controls">
-        <div style="margin-bottom: 5px;"><strong>表示項目を選択：</strong></div>
+        <div style="margin-bottom: 10px;"><strong>表示したい項目をタップしてください：</strong></div>
         <div id="checkboxes">データを読み込み中...</div>
     </div>
 
@@ -28,60 +72,53 @@
     </div>
 
     <script>
-        // 公開されたCSVのURL
         const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSwgCvHlDl6YtpEX9b1n_nNYQU-i0FVhoE7U90dHXe_q9cbJjUmZSMpxTZtDTwqRO7UBrElKMZCSP2a/pub?gid=1826550484&single=true&output=csv';
 
         let rawData = [];
         const labels = ["0歳", "1歳", "2歳", "3歳", "4歳", "5歳", "6歳", "7歳", "8歳", "9歳", "10歳", "11歳", "12歳", "13歳", "14歳", "15歳", "16歳"];
         let chart;
 
-        // CSVデータを読み込む関数
         async function loadCsv() {
             try {
                 const response = await fetch(csvUrl);
                 const text = await response.text();
-                // 行ごとに分割し、空行を除去
                 const rows = text.split(/\r?\n/).filter(row => row.trim() !== "");
                 
-                // 2行目以降をデータとして処理
                 rawData = rows.slice(1).map(row => {
-                    // カンマで分割。引用符に囲まれたカンマを無視するための正規表現
                     const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                     return {
-                        name: cols[2]?.replace(/"/g, ''), // C列: 項目名
-                        // AI列(index 34)からAY列(index 50)までを取得して数値化
+                        name: cols[2]?.replace(/"/g, ''),
                         values: cols.slice(34, 51).map(v => {
                             const num = parseFloat(v.replace(/[",]/g, ''));
                             return isNaN(num) ? null : num;
                         })
                     };
-                }).filter(item => item.name); // 名前がある行だけ残す
+                }).filter(item => item.name);
 
                 setupCheckboxes();
             } catch (e) {
-                console.error(e);
-                document.getElementById('checkboxes').innerText = "データの読み込みに失敗しました。URLを確認してください。";
+                document.getElementById('checkboxes').innerText = "読み込みエラーが発生しました。";
             }
         }
 
-        // チェックボックスを作成
         function setupCheckboxes() {
             const container = document.getElementById('checkboxes');
             container.innerHTML = '';
             
             rawData.forEach((item, index) => {
-                const div = document.createElement('div');
-                div.className = 'checkbox-item';
-                // 最初は1つ目だけチェックを入れる設定
+                const labelWrapper = document.createElement('label');
+                labelWrapper.className = 'checkbox-item';
+                
                 const checked = index === 0 ? 'checked' : '';
-                div.innerHTML = `<input type="checkbox" id="cb${index}" value="${index}" ${checked} onchange="updateChart()">
-                                 <label for="cb${index}">${item.name}</label>`;
-                container.appendChild(div);
+                labelWrapper.innerHTML = `
+                    <input type="checkbox" id="cb${index}" value="${index}" ${checked} onchange="updateChart()">
+                    <span>${item.name}</span>
+                `;
+                container.appendChild(labelWrapper);
             });
             createChart();
         }
 
-        // グラフの初期設定
         function createChart() {
             const ctx = document.getElementById('insuranceChart').getContext('2d');
             chart = new Chart(ctx, {
@@ -93,18 +130,23 @@
                     scales: { 
                         y: { 
                             beginAtZero: true,
-                            title: { display: true, text: '支払額 (円)' }
-                        } 
+                            ticks: { font: { size: 14 } } // 軸の目盛りも大きく
+                        },
+                        x: {
+                            ticks: { font: { size: 14 } }
+                        }
                     },
                     plugins: {
-                        legend: { position: 'top', labels: { boxWidth: 15 } }
+                        legend: { 
+                            position: 'top', 
+                            labels: { font: { size: 14 }, boxWidth: 20 } 
+                        }
                     }
                 }
             });
             updateChart();
         }
 
-        // チェック状態に合わせてグラフを更新
         function updateChart() {
             const selected = [];
             document.querySelectorAll('#checkboxes input:checked').forEach(cb => {
@@ -114,17 +156,16 @@
                     data: rawData[idx].values,
                     borderColor: `hsl(${(idx * 137.5) % 360}, 70%, 50%)`,
                     backgroundColor: `hsl(${(idx * 137.5) % 360}, 70%, 50%)`,
-                    borderWidth: 2,
-                    pointRadius: 3,
+                    borderWidth: 3,
+                    pointRadius: 4,
                     tension: 0.1,
-                    spanGaps: true // データが空でも線を繋ぐ
+                    spanGaps: true
                 });
             });
             chart.data.datasets = selected;
             chart.update();
         }
 
-        // 実行
         loadCsv();
     </script>
 </body>
