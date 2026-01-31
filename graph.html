@@ -6,56 +6,47 @@
     <title>保険料推移グラフ</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* 全体の基本設定 */
-        body { font-family: sans-serif; margin: 15px; font-size: 18px; line-height: 1.5; }
-        h3 { margin: 10px 0; font-size: 22px; }
+        body { font-family: sans-serif; margin: 10px; font-size: 16px; color: #333; }
+        h3 { margin: 5px 0 10px 0; font-size: 18px; }
 
-        /* 項目選択エリア（見やすく、スクロールしやすく） */
         #controls { 
-            margin-bottom: 20px; 
-            border: 2px solid #ddd; 
-            padding: 15px; 
-            max-height: 180px; 
+            margin-bottom: 15px; 
+            border: 1px solid #ccc; 
+            padding: 10px; 
+            max-height: 140px; 
             overflow-y: auto; 
-            background: #fff;
-            border-radius: 8px;
+            background: #fdfdfd;
+            border-radius: 4px;
         }
 
-        /* チェックボックスとラベルのセット（押しやすいボタン風） */
+        /* 項目を中間サイズに調整 */
         .checkbox-item { 
             display: inline-flex;
             align-items: center;
-            margin: 5px 10px 5px 0;
-            padding: 8px 12px;
-            background: #eee;
-            border-radius: 20px;
+            margin: 3px 6px 3px 0;
+            padding: 4px 10px; /* 余白を半分に */
+            background: #f0f0f0;
+            border-radius: 15px;
             cursor: pointer;
-            user-select: none;
-            transition: background 0.2s;
+            border: 1px solid #ddd;
         }
-        .checkbox-item:hover { background: #e0e0e0; }
         
-        /* 本物のチェックボックスを少し大きく */
+        /* チェックボックスを中間サイズ(18px)に */
         .checkbox-item input[type="checkbox"] {
-            width: 22px;
-            height: 22px;
-            margin-right: 10px;
-            cursor: pointer;
+            width: 18px;
+            height: 18px;
+            margin-right: 6px;
         }
 
-        /* ラベルの文字を大きく */
-        .checkbox-item label {
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
+        .checkbox-item span {
+            font-size: 15px; /* 読みやすい中間サイズ */
+            font-weight: 500;
         }
 
-        /* グラフエリア（高さは控えめ、横幅いっぱい） */
         .chart-container { 
             position: relative; 
-            height: 40vh; /* 画面の約40% */
+            height: 35vh; /* 画面の約1/3に固定 */
             width: 100%; 
-            margin-top: 10px;
         }
     </style>
 </head>
@@ -63,7 +54,6 @@
     <h3>📊 保険料推移グラフ</h3>
     
     <div id="controls">
-        <div style="margin-bottom: 10px;"><strong>表示したい項目をタップしてください：</strong></div>
         <div id="checkboxes">データを読み込み中...</div>
     </div>
 
@@ -97,23 +87,18 @@
 
                 setupCheckboxes();
             } catch (e) {
-                document.getElementById('checkboxes').innerText = "読み込みエラーが発生しました。";
+                document.getElementById('checkboxes').innerText = "エラー";
             }
         }
 
         function setupCheckboxes() {
             const container = document.getElementById('checkboxes');
             container.innerHTML = '';
-            
             rawData.forEach((item, index) => {
                 const labelWrapper = document.createElement('label');
                 labelWrapper.className = 'checkbox-item';
-                
                 const checked = index === 0 ? 'checked' : '';
-                labelWrapper.innerHTML = `
-                    <input type="checkbox" id="cb${index}" value="${index}" ${checked} onchange="updateChart()">
-                    <span>${item.name}</span>
-                `;
+                labelWrapper.innerHTML = `<input type="checkbox" id="cb${index}" value="${index}" ${checked} onchange="updateChart()"><span>${item.name}</span>`;
                 container.appendChild(labelWrapper);
             });
             createChart();
@@ -128,19 +113,11 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: { 
-                        y: { 
-                            beginAtZero: true,
-                            ticks: { font: { size: 14 } } // 軸の目盛りも大きく
-                        },
-                        x: {
-                            ticks: { font: { size: 14 } }
-                        }
+                        y: { ticks: { font: { size: 12 } } },
+                        x: { ticks: { font: { size: 12 } } }
                     },
                     plugins: {
-                        legend: { 
-                            position: 'top', 
-                            labels: { font: { size: 14 }, boxWidth: 20 } 
-                        }
+                        legend: { labels: { font: { size: 12 }, boxWidth: 15 } }
                     }
                 }
             });
@@ -155,9 +132,8 @@
                     label: rawData[idx].name,
                     data: rawData[idx].values,
                     borderColor: `hsl(${(idx * 137.5) % 360}, 70%, 50%)`,
-                    backgroundColor: `hsl(${(idx * 137.5) % 360}, 70%, 50%)`,
-                    borderWidth: 3,
-                    pointRadius: 4,
+                    borderWidth: 2,
+                    pointRadius: 3,
                     tension: 0.1,
                     spanGaps: true
                 });
@@ -165,7 +141,6 @@
             chart.data.datasets = selected;
             chart.update();
         }
-
         loadCsv();
     </script>
 </body>
