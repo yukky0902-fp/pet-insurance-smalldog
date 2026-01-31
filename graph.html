@@ -7,29 +7,20 @@
     <style>
         body { font-family: sans-serif; margin: 10px; font-size: 14px; }
         #controls { 
-            margin-bottom: 10px; 
-            border: 1px solid #ccc; 
-            padding: 10px; 
-            max-height: 120px; /* 高さを抑えてコンパクトに */
-            overflow-y: auto; 
-            background: #f9f9f9;
+            margin-bottom: 10px; border: 1px solid #ccc; padding: 10px; 
+            max-height: 120px; overflow-y: auto; background: #f9f9f9;
         }
-        .checkbox-item { display: inline-block; margin-right: 12px; white-space: nowrap; }
-        /* グラフの親要素の高さを1/3程度に制限 */
-        .chart-container {
-            position: relative;
-            height: 30vh; /* 画面の高さの約1/3 */
-            width: 95vw;
-        }
+        .checkbox-item { display: inline-block; margin-right: 12px; white-space: nowrap; margin-bottom: 5px; }
+        /* グラフの高さを画面の約1/3に調整 */
+        .chart-container { position: relative; height: 35vh; width: 95vw; }
     </style>
 </head>
 <body>
-
     <h3 style="margin: 5px 0;">保険料推移グラフ</h3>
-
+    
     <div id="controls">
-        <strong>表示項目：</strong>
-        <div id="checkboxes">読み込み中...</div>
+        <div style="margin-bottom: 5px;"><strong>表示項目を選択：</strong></div>
+        <div id="checkboxes">データを読み込み中...</div>
     </div>
 
     <div class="chart-container">
@@ -37,41 +28,60 @@
     </div>
 
     <script>
+        // 公開されたCSVのURL
+        const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSwgCvHlDl6YtpEX9b1n_nNYQU-i0FVhoE7U90dHXe_q9cbJjUmZSMpxTZtDTwqRO7UBrElKMZCSP2a/pub?gid=1826550484&single=true&output=csv';
+
         let rawData = [];
         const labels = ["0歳", "1歳", "2歳", "3歳", "4歳", "5歳", "6歳", "7歳", "8歳", "9歳", "10歳", "11歳", "12歳", "13歳", "14歳", "15歳", "16歳"];
         let chart;
 
-        // GASからデータを取得
-        window.onload = function() {
-            google.script.run.withSuccessHandler(setupData).getInsuranceData();
-        };
+        // CSVデータを読み込む関数
+        async function loadCsv() {
+            try {
+                const response = await fetch(csvUrl);
+                const text = await response.text();
+                // 行ごとに分割し、空行を除去
+                const rows = text.split(/\r?\n/).filter(row => row.trim() !== "");
+                
+                // 2行目以降をデータとして処理
+                rawData = rows.slice(1).map(row => {
+                    // カンマで分割。引用符に囲まれたカンマを無視するための正規表現
+                    const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                    return {
+                        name: cols[2]?.replace(/"/g, ''), // C列: 項目名
+                        // AI列(index 34)からAY列(index 50)までを取得して数値化
+                        values: cols.slice(34, 51).map(v => {
+                            const num = parseFloat(v.replace(/[",]/g, ''));
+                            return isNaN(num) ? null : num;
+                        })
+                    };
+                }).filter(item => item.name); // 名前がある行だけ残す
 
-        function setupData(data) {
-            rawData = data;
+                setupCheckboxes();
+            } catch (e) {
+                console.error(e);
+                document.getElementById('checkboxes').innerText = "データの読み込みに失敗しました。URLを確認してください。";
+            }
+        }
+
+        // チェックボックスを作成
+        function setupCheckboxes() {
             const container = document.getElementById('checkboxes');
             container.innerHTML = '';
             
             rawData.forEach((item, index) => {
                 const div = document.createElement('div');
                 div.className = 'checkbox-item';
-                const cb = document.createElement('input');
-                cb.type = 'checkbox';
-                cb.id = 'cb' + index;
-                cb.value = index;
-                cb.checked = (index < 3); // 最初は3つだけ表示
-                cb.onchange = updateChart;
-                
-                const label = document.createElement('label');
-                label.htmlFor = 'cb' + index;
-                label.textContent = item.name;
-                
-                div.appendChild(cb);
-                div.appendChild(label);
+                // 最初は1つ目だけチェックを入れる設定
+                const checked = index === 0 ? 'checked' : '';
+                div.innerHTML = `<input type="checkbox" id="cb${index}" value="${index}" ${checked} onchange="updateChart()">
+                                 <label for="cb${index}">${item.name}</label>`;
                 container.appendChild(div);
             });
             createChart();
         }
 
+        // グラフの初期設定
         function createChart() {
             const ctx = document.getElementById('insuranceChart').getContext('2d');
             chart = new Chart(ctx, {
@@ -79,22 +89,22 @@
                 data: { labels: labels, datasets: [] },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: false, // コンテナの高さに合わせる
-                    scales: {
+                    maintainAspectRatio: false,
+                    scales: { 
                         y: { 
                             beginAtZero: true,
-                            ticks: { font: { size: 10 } } 
-                        },
-                        x: { ticks: { font: { size: 10 } } }
+                            title: { display: true, text: '支払額 (円)' }
+                        } 
                     },
                     plugins: {
-                        legend: { labels: { boxWidth: 12, font: { size: 11 } } }
+                        legend: { position: 'top', labels: { boxWidth: 15 } }
                     }
                 }
             });
             updateChart();
         }
 
+        // チェック状態に合わせてグラフを更新
         function updateChart() {
             const selected = [];
             document.querySelectorAll('#checkboxes input:checked').forEach(cb => {
@@ -105,13 +115,17 @@
                     borderColor: `hsl(${(idx * 137.5) % 360}, 70%, 50%)`,
                     backgroundColor: `hsl(${(idx * 137.5) % 360}, 70%, 50%)`,
                     borderWidth: 2,
-                    pointRadius: 2,
-                    tension: 0.2
+                    pointRadius: 3,
+                    tension: 0.1,
+                    spanGaps: true // データが空でも線を繋ぐ
                 });
             });
             chart.data.datasets = selected;
             chart.update();
         }
+
+        // 実行
+        loadCsv();
     </script>
 </body>
 </html>
