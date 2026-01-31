@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>保険料比較グラフ</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        #controls { margin-bottom: 20px; border: 1px solid #ccc; padding: 10px; max-height: 200px; overflow-y: auto; }
+        .checkbox-item { display: inline-block; margin-right: 15px; }
+        canvas { max-width: 1000px; }
+    </style>
+</head>
+<body>
+
+    <h2>保険料推移グラフ</h2>
+
+    <div id="controls">
+        <strong>表示する項目を選択してください：</strong><br>
+        <div id="checkboxes"></div>
+    </div>
+
+    <div style="width: 100%;">
+        <canvas id="insuranceChart"></canvas>
+    </div>
+
+    <script>
+        // スプレッドシートから取得した想定のデータ (実際にはGASのgoogle.script.run等で取得)
+        // ここではスプレッドシートの内容に基づいたサンプルデータを定義します
+        const rawData = [
+            { name: "ペット＆ファミリー(50%)", values: [1940, 1610, 1620, 1690, 1830, 1870, 2160, 2400, 2790, 3220, 4450, 4450, 4450, 4450, 4450, 4450, 4450] },
+            { name: "ペット＆ファミリー(70%)", values: [2330, 1860, 1880, 1980, 2180, 2230, 2560, 2910, 3450, 4050, 5770, 5770, 5770, 5770, 5770, 5770, 5770] },
+            { name: "FPCフィット(50%)", values: [1240, 1240, 1240, 1240, 1240, 1710, 1710, 1710, 1710, 3060, 3060, 3060, 5160, 5160, 5160, 5160, 5160] },
+            { name: "FPCフィット(70%)", values: [1580, 1580, 1580, 1580, 1580, 2190, 2190, 2190, 2190, 3970, 3970, 3970, 6670, 6670, 6670, 6670, 6670] }
+            // C列の40行目まで同様の形式でデータが入る想定
+        ];
+
+        const labels = ["0歳", "1歳", "2歳", "3歳", "4歳", "5歳", "6歳", "7歳", "8歳", "9歳", "10歳", "11歳", "12歳", "13歳", "14歳", "15歳", "16歳"];
+        let chart;
+
+        // 初期化処理
+        function init() {
+            const checkboxContainer = document.getElementById('checkboxes');
+            
+            rawData.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'checkbox-item';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.id = 'cb' + index;
+                cb.value = index;
+                cb.checked = index < 2; // 最初は2つだけ表示
+                cb.onchange = updateChart;
+                
+                const label = document.createElement('label');
+                label.htmlFor = 'cb' + index;
+                label.textContent = item.name;
+                
+                div.appendChild(cb);
+                div.appendChild(label);
+                checkboxContainer.appendChild(div);
+            });
+
+            createChart();
+        }
+
+        // グラフ作成
+        function createChart() {
+            const ctx = document.getElementById('insuranceChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: []
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { title: { display: true, text: '支払額 (円)' }, beginAtZero: true }
+                    }
+                }
+            });
+            updateChart();
+        }
+
+        // チェックボックスの状態に合わせてグラフを更新
+        function updateChart() {
+            const selectedDatasets = [];
+            const checkboxes = document.querySelectorAll('#checkboxes input[type="checkbox"]');
+            
+            checkboxes.forEach(cb => {
+                if (cb.checked) {
+                    const dataIndex = cb.value;
+                    const item = rawData[dataIndex];
+                    selectedDatasets.push({
+                        label: item.name,
+                        data: item.values,
+                        fill: false,
+                        borderColor: `hsl(${dataIndex * 137.5 % 360}, 70%, 50%)`, // 自動色分け
+                        tension: 0.1
+                    });
+                }
+            });
+
+            chart.data.datasets = selectedDatasets;
+            chart.update();
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
